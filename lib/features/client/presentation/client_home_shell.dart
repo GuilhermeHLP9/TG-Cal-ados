@@ -19,13 +19,13 @@ class _ClientHomeShellState extends State<ClientHomeShell> {
     final screens = const [
       ClientChatScreen(),
       OrdersOverviewScreen(),
-      ClientProfileScreen(),
       ClientSettingsScreen(),
     ];
 
     return Scaffold(
       backgroundColor: const Color(0xFFF0F3F4),
       appBar: AppBar(
+        automaticallyImplyLeading: false,
         toolbarHeight: 72,
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
@@ -48,14 +48,8 @@ class _ClientHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(
-      children: const [
-        CircleAvatar(
-          radius: 22,
-          backgroundColor: Colors.white,
-          child: Icon(Icons.person, color: AppColors.primary),
-        ),
-        SizedBox(width: 12),
-        Expanded(
+      children: [
+        const Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisAlignment: MainAxisAlignment.center,
@@ -72,10 +66,47 @@ class _ClientHeader extends StatelessWidget {
             ],
           ),
         ),
-        CircleAvatar(
-          radius: 20,
-          backgroundColor: Colors.white24,
-          child: Icon(Icons.person_outline, color: Colors.white, size: 28),
+        PopupMenuButton<String>(
+          tooltip: 'Menu do perfil',
+          offset: const Offset(0, 48),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          onSelected: (value) {
+            if (value == 'logout') {
+              Navigator.of(context).pop();
+            }
+            if (value == 'profile') {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Perfil sera detalhado depois.')),
+              );
+            }
+          },
+          itemBuilder: (context) => const [
+            PopupMenuItem(
+              value: 'profile',
+              child: Row(
+                children: [
+                  Icon(Icons.person_outline),
+                  SizedBox(width: 10),
+                  Text('Perfil'),
+                ],
+              ),
+            ),
+            PopupMenuItem(
+              value: 'logout',
+              child: Row(
+                children: [
+                  Icon(Icons.logout),
+                  SizedBox(width: 10),
+                  Text('Sair'),
+                ],
+              ),
+            ),
+          ],
+          child: const CircleAvatar(
+            radius: 22,
+            backgroundColor: Colors.white,
+            child: Icon(Icons.person, color: AppColors.primary, size: 30),
+          ),
         ),
       ],
     );
@@ -96,7 +127,6 @@ class _ClientBottomNav extends StatelessWidget {
     const items = [
       (Icons.chat_bubble, 'CHAT'),
       (Icons.assignment_outlined, 'PEDIDOS'),
-      (Icons.person_outline, 'PERFIL'),
       (Icons.settings_outlined, 'CONFIGURACOES'),
     ];
 
@@ -314,55 +344,55 @@ class _ComposerBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(10, 10, 10, 12),
+      padding: const EdgeInsets.fromLTRB(8, 8, 8, 10),
       color: Colors.white,
       child: SafeArea(
         top: false,
         child: Row(
           children: [
+            IconButton(
+              tooltip: 'Anexar arquivo',
+              onPressed: () {},
+              icon: const Icon(Icons.attach_file, color: AppColors.primary),
+            ),
+            IconButton(
+              tooltip: 'Enviar imagem',
+              onPressed: () {},
+              icon: const Icon(Icons.image_outlined, color: AppColors.primary),
+            ),
             Expanded(
-              child: Container(
-                height: 44,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFFCED7DE)),
+              child: TextField(
+                minLines: 1,
+                maxLines: 3,
+                decoration: InputDecoration(
+                  hintText: 'Mensagem',
+                  isDense: true,
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(24),
+                    borderSide: const BorderSide(color: Color(0xFFCED7DE)),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(24),
+                    borderSide: const BorderSide(color: Color(0xFFCED7DE)),
+                  ),
                 ),
               ),
             ),
-            const SizedBox(width: 10),
-            Expanded(
-              flex: 2,
-              child: SizedBox(
-                height: 44,
-                child: ElevatedButton.icon(
-                  onPressed: () {},
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                  icon: const Icon(Icons.upload_file_rounded, size: 20),
-                  label: const Text('ENVIAR ARQUIVO'),
-                ),
+            const SizedBox(width: 6),
+            IconButton.filled(
+              tooltip: 'Enviar mensagem',
+              onPressed: () {},
+              style: IconButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
               ),
+              icon: const Icon(Icons.send),
             ),
           ],
         ),
       ),
-    );
-  }
-}
-
-class ClientProfileScreen extends StatelessWidget {
-  const ClientProfileScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return const _PlaceholderSection(
-      title: 'Perfil',
-      subtitle: 'Aba visual criada para seguir a navegacao da referencia.',
     );
   }
 }
@@ -372,35 +402,63 @@ class ClientSettingsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const _PlaceholderSection(
-      title: 'Configuracoes',
-      subtitle: 'Estilizacao pronta. As funcoes podem entrar depois.',
-    );
-  }
-}
-
-class _PlaceholderSection extends StatelessWidget {
-  const _PlaceholderSection({
-    required this.title,
-    required this.subtitle,
-  });
-
-  final String title;
-  final String subtitle;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(20),
+    return const Padding(
+      padding: EdgeInsets.all(20),
       child: AppCard(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(title, style: Theme.of(context).textTheme.headlineMedium),
-            const SizedBox(height: 8),
-            Text(subtitle, style: Theme.of(context).textTheme.bodyLarge),
+            Text(
+              'Configuracoes',
+              style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800),
+            ),
+            SizedBox(height: 18),
+            _InfoLine(label: 'Versao do app', value: '0.1.0 MVP'),
+            _InfoLine(label: 'Tipo de usuario', value: 'Cliente'),
+            _InfoLine(label: 'Plataforma', value: 'Flutter'),
+            _InfoLine(label: 'Ambiente', value: 'Desenvolvimento'),
+            _InfoLine(label: 'API', value: 'Aguardando integracao'),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _InfoLine extends StatelessWidget {
+  const _InfoLine({
+    required this.label,
+    required this.value,
+  });
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Text(
+              label,
+              style: const TextStyle(
+                color: AppColors.muted,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Flexible(
+            child: Text(
+              value,
+              textAlign: TextAlign.right,
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+          ),
+        ],
       ),
     );
   }

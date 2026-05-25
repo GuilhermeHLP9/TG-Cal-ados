@@ -1,17 +1,61 @@
-# mobile_flutter
+# Sistema Gestao de Calcados
 
-A new Flutter project.
+Projeto do TG organizado em uma pasta propria, com:
 
-## Getting Started
+- app mobile principal em Flutter
+- API separada em Node.js + Express + Prisma
+- app Expo antigo preservado apenas como legado
 
-This project is a starting point for a Flutter application.
+## Estrutura
 
-A few resources to get you started if this is your first Flutter project:
+```text
+sistema-gestao-calcados/
+|- apps/
+|  |- mobile_flutter/       # App principal
+|  |- api/                  # Backend
+|  \- mobile_expo_legacy/   # Base antiga, nao usar
+\- package.json
+```
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+## Rodando o app Flutter
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+```powershell
+cd C:\Users\guilh\Desktop\ADS\TG\sistema-gestao-calcados\apps\mobile_flutter
+C:\flutter\bin\flutter.bat run
+```
+
+Para listar dispositivos:
+
+```powershell
+C:\flutter\bin\flutter.bat devices
+```
+
+## Rodando a API
+
+```powershell
+cd C:\Users\guilh\Desktop\ADS\TG\sistema-gestao-calcados
+npm.cmd run api
+```
+
+## Organização do Flutter
+
+```text
+lib/
+|- app/
+|- core/
+|  |- models/
+|  |- theme/
+|  \- widgets/
+\- features/
+   |- auth/
+   |- client/
+   |- orders/
+   \- owner/
+```
+
+## MVP atual no Flutter
+
+- login com entrada demo para cliente e proprietario
+- area do cliente com pedidos e criacao de pedido
+- area do proprietario com dashboard e lista de pedidos
+- dados mockados prontos para trocar por integracao real

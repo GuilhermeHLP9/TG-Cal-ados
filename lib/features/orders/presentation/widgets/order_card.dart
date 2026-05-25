@@ -42,9 +42,13 @@ class OrderCard extends StatelessWidget {
           Text(order.productName, style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 8),
           Text('Cliente: ${order.clientName}'),
+          Text('Tamanhos: ${order.sizes}'),
+          Text('Materiais: ${order.materials}'),
           Text('Quantidade: ${order.quantity} pares'),
           Text('Entrega: ${order.dueDate}'),
           Text('Preco por par: R\$ ${order.pricePerPair.toStringAsFixed(2)}'),
+          if (order.referencePhoto != null && order.referencePhoto!.isNotEmpty)
+            Text('Referencia: ${order.referencePhoto!}'),
           if (order.notes != null) ...[
             const SizedBox(height: 8),
             Text('Obs: ${order.notes!}'),

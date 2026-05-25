@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 
-import '../../../core/widgets/app_card.dart';
-import '../../orders/data/mock_orders.dart';
+import '../../../core/theme/app_theme.dart';
+import 'create_order_screen.dart';
+import '../../orders/data/order_store.dart';
 import '../../orders/presentation/widgets/order_card.dart';
 
 class OrdersOverviewScreen extends StatelessWidget {
@@ -9,30 +10,40 @@ class OrdersOverviewScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final orders = OrderScope.of(context).orders;
+
     return ListView.separated(
       padding: const EdgeInsets.all(20),
-      itemCount: mockOrders.length + 1,
+      itemCount: orders.length + 1,
       separatorBuilder: (context, index) => const SizedBox(height: 14),
       itemBuilder: (context, index) {
         if (index == 0) {
-          return const AppCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
+          return Row(
+            children: [
+              const Expanded(
+                child: Text(
                   'Pedidos',
                   style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800),
                 ),
-                SizedBox(height: 6),
-                Text(
-                  'Aqui vao aparecer os pedidos do cliente com o mesmo clima visual da tela principal.',
+              ),
+              IconButton.filled(
+                tooltip: 'Criar pedido',
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const CreateOrderScreen()),
+                  );
+                },
+                style: IconButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
                 ),
-              ],
-            ),
+                icon: const Icon(Icons.add),
+              ),
+            ],
           );
         }
 
-        return OrderCard(order: mockOrders[index - 1]);
+        return OrderCard(order: orders[index - 1]);
       },
     );
   }
