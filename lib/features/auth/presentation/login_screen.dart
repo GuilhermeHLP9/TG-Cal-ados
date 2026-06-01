@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/services/api_client.dart';
 import '../../../../core/widgets/app_card.dart';
 import '../../../../core/widgets/section_heading.dart';
-import '../../client/presentation/client_home_shell.dart';
-import '../../owner/presentation/owner_home_shell.dart';
+import 'auth_navigation.dart';
+import 'register_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -16,6 +17,9 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController(text: 'cliente@calcados.com');
   final _passwordController = TextEditingController(text: '123456');
+  final _apiClient = ApiClient();
+  bool _isLoading = false;
+  String? _error;
 
   @override
   void dispose() {
@@ -24,14 +28,36 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  void _enterApp() {
-    final email = _emailController.text.trim().toLowerCase();
-    final nextPage =
-        email.contains('dono') ? const OwnerHomeShell() : const ClientHomeShell();
+  Future<void> _enterApp() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
 
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => nextPage),
-    );
+    try {
+      final session = await _apiClient.login(
+        email: _emailController.text.trim().toLowerCase(),
+        password: _passwordController.text,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      openAuthenticatedHome(
+        context,
+        apiClient: _apiClient,
+        session: session,
+      );
+    } on ApiException catch (error) {
+      setState(() => _error = error.message);
+    } catch (_) {
+      setState(() => _error = 'Nao foi possivel conectar com a API.');
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
   @override
@@ -78,9 +104,35 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 20),
                   ElevatedButton(
-                    onPressed: _enterApp,
-                    child: const Text('Entrar'),
+                    onPressed: _isLoading ? null : _enterApp,
+                    child: Text(_isLoading ? 'Entrando...' : 'Entrar'),
                   ),
+                  const SizedBox(height: 10),
+                  OutlinedButton.icon(
+                    onPressed: _isLoading
+                        ? null
+                        : () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => RegisterScreen(
+                                  apiClient: _apiClient,
+                                ),
+                              ),
+                            );
+                          },
+                    icon: const Icon(Icons.person_add_alt_1),
+                    label: const Text('Criar conta'),
+                  ),
+                  if (_error != null) ...[
+                    const SizedBox(height: 12),
+                    Text(
+                      _error!,
+                      style: const TextStyle(
+                        color: Colors.red,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -94,9 +146,9 @@ class _LoginScreenState extends State<LoginScreen> {
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
                   ),
                   SizedBox(height: 8),
-                  Text('Use dono@calcados.com para abrir a area do proprietario.'),
+                  Text('Use dono@calcados.com / 123456 para o proprietario.'),
                   SizedBox(height: 4),
-                  Text('Qualquer outro e-mail abre a area do cliente.'),
+                  Text('Use cliente@calcados.com / 123456 para o cliente.'),
                 ],
               ),
             ),

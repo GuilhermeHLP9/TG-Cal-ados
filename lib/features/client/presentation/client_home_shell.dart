@@ -1,11 +1,22 @@
 import 'package:flutter/material.dart';
 
 import 'orders_overview_screen.dart';
+import '../../../core/services/api_client.dart';
 import '../../../core/theme/app_theme.dart';
-import '../../../core/widgets/app_card.dart';
+import '../../auth/presentation/logout.dart';
+import '../../profile/presentation/profile_settings_screen.dart';
 
 class ClientHomeShell extends StatefulWidget {
-  const ClientHomeShell({super.key});
+  const ClientHomeShell({
+    super.key,
+    required this.apiClient,
+    required this.token,
+    required this.user,
+  });
+
+  final ApiClient apiClient;
+  final String token;
+  final AuthUser user;
 
   @override
   State<ClientHomeShell> createState() => _ClientHomeShellState();
@@ -13,13 +24,24 @@ class ClientHomeShell extends StatefulWidget {
 
 class _ClientHomeShellState extends State<ClientHomeShell> {
   int _currentIndex = 0;
+  late AuthUser _user;
+
+  @override
+  void initState() {
+    super.initState();
+    _user = widget.user;
+  }
 
   @override
   Widget build(BuildContext context) {
-    final screens = const [
-      ClientChatScreen(),
-      OrdersOverviewScreen(),
-      ClientSettingsScreen(),
+    final screens = [
+      const OrdersOverviewScreen(),
+      ProfileSettingsScreen(
+        apiClient: widget.apiClient,
+        token: widget.token,
+        user: _user,
+        onUserChanged: (user) => setState(() => _user = user),
+      ),
     ];
 
     return Scaffold(
@@ -31,7 +53,10 @@ class _ClientHomeShellState extends State<ClientHomeShell> {
         foregroundColor: Colors.white,
         elevation: 3,
         titleSpacing: 12,
-        title: const _ClientHeader(),
+        title: _ClientHeader(
+          user: _user,
+          onProfileTap: () => setState(() => _currentIndex = 1),
+        ),
       ),
       body: screens[_currentIndex],
       bottomNavigationBar: _ClientBottomNav(
@@ -43,25 +68,31 @@ class _ClientHomeShellState extends State<ClientHomeShell> {
 }
 
 class _ClientHeader extends StatelessWidget {
-  const _ClientHeader();
+  const _ClientHeader({
+    required this.user,
+    required this.onProfileTap,
+  });
+
+  final AuthUser user;
+  final VoidCallback onProfileTap;
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
-        const Expanded(
+        Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Text(
-                'Pai (Fornecedor)',
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+                user.company?.name ?? 'Empresa',
+                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
               ),
-              SizedBox(height: 2),
+              const SizedBox(height: 2),
               Text(
-                'Cliente',
-                style: TextStyle(fontSize: 13, color: Colors.white70),
+                user.name,
+                style: const TextStyle(fontSize: 13, color: Colors.white70),
               ),
             ],
           ),
@@ -72,12 +103,10 @@ class _ClientHeader extends StatelessWidget {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           onSelected: (value) {
             if (value == 'logout') {
-              Navigator.of(context).pop();
+              logout(context);
             }
             if (value == 'profile') {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Perfil sera detalhado depois.')),
-              );
+              onProfileTap();
             }
           },
           itemBuilder: (context) => const [
@@ -125,7 +154,6 @@ class _ClientBottomNav extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const items = [
-      (Icons.chat_bubble, 'CHAT'),
       (Icons.assignment_outlined, 'PEDIDOS'),
       (Icons.settings_outlined, 'CONFIGURACOES'),
     ];
@@ -392,73 +420,6 @@ class _ComposerBar extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class ClientSettingsScreen extends StatelessWidget {
-  const ClientSettingsScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return const Padding(
-      padding: EdgeInsets.all(20),
-      child: AppCard(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Configuracoes',
-              style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800),
-            ),
-            SizedBox(height: 18),
-            _InfoLine(label: 'Versao do app', value: '0.1.0 MVP'),
-            _InfoLine(label: 'Tipo de usuario', value: 'Cliente'),
-            _InfoLine(label: 'Plataforma', value: 'Flutter'),
-            _InfoLine(label: 'Ambiente', value: 'Desenvolvimento'),
-            _InfoLine(label: 'API', value: 'Aguardando integracao'),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _InfoLine extends StatelessWidget {
-  const _InfoLine({
-    required this.label,
-    required this.value,
-  });
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 14),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: Text(
-              label,
-              style: const TextStyle(
-                color: AppColors.muted,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Flexible(
-            child: Text(
-              value,
-              textAlign: TextAlign.right,
-              style: const TextStyle(fontWeight: FontWeight.w700),
-            ),
-          ),
-        ],
       ),
     );
   }

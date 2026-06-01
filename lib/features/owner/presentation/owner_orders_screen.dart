@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/models/order.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../orders/data/order_store.dart';
+import '../../orders/presentation/order_detail_screen.dart';
 import '../../orders/presentation/widgets/order_card.dart';
 
 enum _OwnerOrderFilter {
@@ -36,6 +37,17 @@ class _OwnerOrdersScreenState extends State<OwnerOrdersScreen> {
     final store = OrderScope.of(context);
     final orders = store.orders;
     final filteredOrders = _filterOrders(orders);
+
+    if (store.isLoading && orders.isEmpty) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (store.error != null && orders.isEmpty) {
+      return _OrdersError(
+        message: store.error!,
+        onRetry: store.loadOrders,
+      );
+    }
 
     return ListView.separated(
       padding: const EdgeInsets.all(20),
@@ -117,7 +129,17 @@ class _OwnerOrdersScreenState extends State<OwnerOrdersScreen> {
 
         return OrderCard(
           order: order,
-          actions: _buildActions(store, order),
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => OrderDetailScreen(
+                  orderId: order.id,
+                  store: store,
+                  canManage: true,
+                ),
+              ),
+            );
+          },
         );
       },
     );
@@ -164,47 +186,40 @@ class _OwnerOrdersScreenState extends State<OwnerOrdersScreen> {
     return orders.where((order) => order.status == status).length;
   }
 
-  List<Widget> _buildActions(OrderStore store, Order order) {
-    if (order.status == OrderStatus.recebido) {
-      return [
-        ElevatedButton(
-          onPressed: () {
-            store.updateStatus(order.id, OrderStatus.novo);
-          },
-          child: const Text('Aceitar pedido'),
-        ),
-        OutlinedButton(
-          onPressed: () {
-            store.updateStatus(order.id, OrderStatus.recusado);
-          },
-          child: const Text('Recusar pedido'),
-        ),
-      ];
-    }
+}
 
-    if (order.status == OrderStatus.novo) {
-      return [
-        ElevatedButton(
-          onPressed: () {
-            store.updateStatus(order.id, OrderStatus.emProducao);
-          },
-          child: const Text('Colocar em producao'),
-        ),
-      ];
-    }
+class _OrdersError extends StatelessWidget {
+  const _OrdersError({
+    required this.message,
+    required this.onRetry,
+  });
 
-    if (order.status == OrderStatus.emProducao) {
-      return [
-        ElevatedButton(
-          onPressed: () {
-            store.updateStatus(order.id, OrderStatus.paraEntrega);
-          },
-          child: const Text('Terminar pedido'),
-        ),
-      ];
-    }
+  final String message;
+  final VoidCallback onRetry;
 
-    return const [];
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Tentar novamente'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

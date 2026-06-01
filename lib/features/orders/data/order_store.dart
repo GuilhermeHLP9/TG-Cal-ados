@@ -1,16 +1,72 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/models/order.dart';
+import '../../../core/services/api_client.dart';
 import 'mock_orders.dart';
 
 class OrderStore extends ChangeNotifier {
-  OrderStore() : _orders = List<Order>.from(mockOrders);
+  OrderStore.demo()
+      : _apiClient = null,
+        _token = null,
+        _orders = List<Order>.from(mockOrders);
+
+  OrderStore.api({
+    required ApiClient apiClient,
+    required String token,
+  })  : _apiClient = apiClient,
+        _token = token,
+        _orders = [] {
+    loadOrders();
+  }
 
   final List<Order> _orders;
+  final ApiClient? _apiClient;
+  final String? _token;
+  bool _isLoading = false;
+  String? _error;
 
   List<Order> get orders => List.unmodifiable(_orders);
+  bool get isLoading => _isLoading;
+  String? get error => _error;
 
-  void addOrder({
+  Order? findById(String orderId) {
+    for (final order in _orders) {
+      if (order.id == orderId) {
+        return order;
+      }
+    }
+
+    return null;
+  }
+
+  Future<void> loadOrders() async {
+    final apiClient = _apiClient;
+    final token = _token;
+
+    if (apiClient == null || token == null) {
+      return;
+    }
+
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final orders = await apiClient.listOrders(token);
+      _orders
+        ..clear()
+        ..addAll(orders);
+    } on ApiException catch (error) {
+      _error = error.message;
+    } catch (_) {
+      _error = 'Nao foi possivel carregar os pedidos.';
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> addOrder({
     required String productName,
     required String sizes,
     required String materials,
@@ -19,7 +75,28 @@ class OrderStore extends ChangeNotifier {
     required String dueDate,
     String? referencePhoto,
     String? notes,
-  }) {
+  }) async {
+    final apiClient = _apiClient;
+    final token = _token;
+
+    if (apiClient != null && token != null) {
+      final order = await apiClient.createOrder(
+        token: token,
+        productName: productName,
+        sizes: sizes,
+        materials: materials,
+        quantity: quantity,
+        pricePerPair: pricePerPair,
+        dueDate: dueDate,
+        referencePhoto: referencePhoto,
+        notes: notes,
+      );
+
+      _orders.insert(0, order);
+      notifyListeners();
+      return;
+    }
+
     final nextId = 'PED-${(_orders.length + 1).toString().padLeft(3, '0')}';
 
     _orders.insert(
@@ -42,14 +119,25 @@ class OrderStore extends ChangeNotifier {
     notifyListeners();
   }
 
-  void updateStatus(String orderId, OrderStatus status) {
+  Future<void> updateStatus(String orderId, OrderStatus status) async {
+    final apiClient = _apiClient;
+    final token = _token;
     final index = _orders.indexWhere((order) => order.id == orderId);
 
     if (index == -1) {
       return;
     }
 
-    _orders[index] = _orders[index].copyWith(status: status);
+    if (apiClient != null && token != null) {
+      _orders[index] = await apiClient.updateOrderStatus(
+        token: token,
+        orderId: orderId,
+        status: status,
+      );
+    } else {
+      _orders[index] = _orders[index].copyWith(status: status);
+    }
+
     notifyListeners();
   }
 }
