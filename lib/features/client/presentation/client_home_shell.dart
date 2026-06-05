@@ -158,59 +158,62 @@ class _ClientBottomNav extends StatelessWidget {
       (Icons.settings_outlined, 'CONFIGURACOES'),
     ];
 
-    return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Color(0x22000000),
-            blurRadius: 10,
-            offset: Offset(0, -2),
-          ),
-        ],
-      ),
-      padding: const EdgeInsets.only(top: 6, bottom: 8),
-      child: Row(
-        children: List.generate(items.length, (index) {
-          final item = items[index];
-          final selected = index == currentIndex;
-
-          return Expanded(
-            child: InkWell(
-              onTap: () => onTap(index),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  AnimatedContainer(
-                    duration: const Duration(milliseconds: 180),
-                    height: 4,
-                    width: 58,
-                    decoration: BoxDecoration(
-                      color: selected ? AppColors.primary : Colors.transparent,
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Icon(
-                    item.$1,
-                    color: selected ? AppColors.primary : Colors.black87,
-                    size: 28,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    item.$2,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
-                      color: selected ? AppColors.primary : Colors.black87,
-                    ),
-                  ),
-                ],
-              ),
+    return SafeArea(
+      top: false,
+      child: Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          boxShadow: [
+            BoxShadow(
+              color: Color(0x22000000),
+              blurRadius: 10,
+              offset: Offset(0, -2),
             ),
-          );
-        }),
+          ],
+        ),
+        padding: const EdgeInsets.only(top: 6, bottom: 8),
+        child: Row(
+          children: List.generate(items.length, (index) {
+            final item = items[index];
+            final selected = index == currentIndex;
+
+            return Expanded(
+              child: InkWell(
+                onTap: () => onTap(index),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
+                      height: 4,
+                      width: 58,
+                      decoration: BoxDecoration(
+                        color: selected ? AppColors.primary : Colors.transparent,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Icon(
+                      item.$1,
+                      color: selected ? AppColors.primary : Colors.black87,
+                      size: 28,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      item.$2,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+                        color: selected ? AppColors.primary : Colors.black87,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }),
+        ),
       ),
     );
   }

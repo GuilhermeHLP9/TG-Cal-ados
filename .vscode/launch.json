@@ -5,28 +5,49 @@
       "name": "Flutter: dispositivo selecionado",
       "request": "launch",
       "type": "dart",
-      "program": "lib/main.dart"
+      "program": "lib/main.dart",
+      "toolArgs": [
+        "--dart-define=API_BASE_URL=http://localhost:3333/api"
+      ]
     },
     {
       "name": "Flutter: Android emulator",
       "request": "launch",
       "type": "dart",
       "program": "lib/main.dart",
-      "deviceId": "emulator-5554"
+      "deviceId": "emulator-5554",
+      "toolArgs": [
+        "--dart-define=API_BASE_URL=http://localhost:3333/api"
+      ]
     },
     {
       "name": "Flutter: Chrome",
       "request": "launch",
       "type": "dart",
       "program": "lib/main.dart",
-      "deviceId": "chrome"
+      "deviceId": "chrome",
+      "toolArgs": [
+        "--dart-define=API_BASE_URL=http://localhost:3333/api"
+      ]
     },
     {
       "name": "Flutter: Windows",
       "request": "launch",
       "type": "dart",
       "program": "lib/main.dart",
-      "deviceId": "windows"
+      "deviceId": "windows",
+      "toolArgs": [
+        "--dart-define=API_BASE_URL=http://localhost:3333/api"
+      ]
+    },
+    {
+      "name": "Flutter: Celular USB",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+      "toolArgs": [
+        "--dart-define=API_BASE_URL=http://127.0.0.1:3333/api"
+      ]
     }
   ]
 }

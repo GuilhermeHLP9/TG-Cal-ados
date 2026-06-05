@@ -28,7 +28,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _confirmPasswordController = TextEditingController();
   final _companyNameController = TextEditingController();
   final _companyCnpjController = TextEditingController();
-  String _role = 'CLIENT';
+  static const _role = 'CLIENT';
   int _step = 0;
   bool _isLoading = false;
   bool _isCheckingEmail = false;
@@ -163,11 +163,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   String get _companySubtitle {
-    if (_role == 'OWNER') {
-      return 'Informe os dados da empresa que sera criada ou atualizada.';
-    }
-
-    return 'Informe os dados da empresa ja cadastrada para vincular o cliente.';
+    return 'Informe a empresa do cliente. Ela sera vinculada ao proprietario.';
   }
 
   Widget _buildUserStep({required GlobalKey<FormState> formKey}) {
@@ -214,27 +210,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
             obscureText: true,
             validator: _confirmPasswordValidator,
           ),
-          const SizedBox(height: 18),
-          Text('Tipo de acesso', style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 8),
-          SegmentedButton<String>(
-            segments: const [
-              ButtonSegment(
-                value: 'CLIENT',
-                label: Text('Cliente'),
-                icon: Icon(Icons.person_outline),
-              ),
-              ButtonSegment(
-                value: 'OWNER',
-                label: Text('Proprietario'),
-                icon: Icon(Icons.factory_outlined),
-              ),
-            ],
-            selected: {_role},
-            onSelectionChanged: (selection) {
-              setState(() => _role = selection.first);
-            },
-          ),
           const SizedBox(height: 20),
           ElevatedButton.icon(
             onPressed: _isCheckingEmail ? null : _goToCompanyStep,
@@ -252,7 +227,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _CompanyHelp(role: _role),
+          const _CompanyHelp(),
           const SizedBox(height: 18),
           Text('Nome da empresa', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
@@ -421,16 +396,10 @@ class _StepPill extends StatelessWidget {
 }
 
 class _CompanyHelp extends StatelessWidget {
-  const _CompanyHelp({required this.role});
-
-  final String role;
+  const _CompanyHelp();
 
   @override
   Widget build(BuildContext context) {
-    final text = role == 'OWNER'
-        ? 'Como proprietario, voce cria ou atualiza a empresa usando o CNPJ.'
-        : 'Como cliente, a empresa ja precisa existir. Use o CNPJ informado pelo proprietario.';
-
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(12),
@@ -440,7 +409,7 @@ class _CompanyHelp extends StatelessWidget {
         border: Border.all(color: AppColors.border),
       ),
       child: Text(
-        text,
+        'Esta conta sera criada como cliente e vinculada ao proprietario cadastrado.',
         style: const TextStyle(
           color: AppColors.primaryDark,
           fontWeight: FontWeight.w700,

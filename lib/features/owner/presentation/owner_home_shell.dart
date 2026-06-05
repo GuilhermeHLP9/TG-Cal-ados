@@ -4,6 +4,8 @@ import 'owner_orders_screen.dart';
 import '../../../core/services/api_client.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../auth/presentation/logout.dart';
+import '../../customers/data/customer_store.dart';
+import '../../customers/presentation/customers_screen.dart';
 import '../../notes/data/note_store.dart';
 import '../../notes/presentation/notes_screen.dart';
 import '../../profile/presentation/profile_settings_screen.dart';
@@ -29,11 +31,22 @@ class OwnerHomeShell extends StatefulWidget {
 class _OwnerHomeShellState extends State<OwnerHomeShell> {
   int _currentIndex = 0;
   late AuthUser _user;
+  late final CustomerStore _customerStore;
 
   @override
   void initState() {
     super.initState();
     _user = widget.user;
+    _customerStore = CustomerStore(
+      apiClient: widget.apiClient,
+      token: widget.token,
+    );
+  }
+
+  @override
+  void dispose() {
+    _customerStore.dispose();
+    super.dispose();
   }
 
   @override
@@ -43,7 +56,8 @@ class _OwnerHomeShellState extends State<OwnerHomeShell> {
         store: widget.noteStore,
         subtitle: 'Registre pendencias da producao, materiais e entregas.',
       ),
-      const OwnerOrdersScreen(),
+      CustomersScreen(store: _customerStore),
+      OwnerOrdersScreen(customerStore: _customerStore),
       ProfileSettingsScreen(
         apiClient: widget.apiClient,
         token: widget.token,
@@ -63,7 +77,7 @@ class _OwnerHomeShellState extends State<OwnerHomeShell> {
         titleSpacing: 12,
         title: _OwnerHeader(
           user: _user,
-          onProfileTap: () => setState(() => _currentIndex = 2),
+          onProfileTap: () => setState(() => _currentIndex = 3),
         ),
       ),
       body: screens[_currentIndex],
@@ -364,63 +378,67 @@ class _OwnerBottomNav extends StatelessWidget {
   Widget build(BuildContext context) {
     const items = [
       (Icons.edit_note_outlined, 'NOTAS'),
+      (Icons.people_alt_outlined, 'CLIENTES'),
       (Icons.assignment_outlined, 'PEDIDOS'),
       (Icons.settings_outlined, 'CONFIGURACOES'),
     ];
 
-    return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Color(0x22000000),
-            blurRadius: 10,
-            offset: Offset(0, -2),
-          ),
-        ],
-      ),
-      padding: const EdgeInsets.only(top: 6, bottom: 8),
-      child: Row(
-        children: List.generate(items.length, (index) {
-          final item = items[index];
-          final selected = index == currentIndex;
-
-          return Expanded(
-            child: InkWell(
-              onTap: () => onTap(index),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  AnimatedContainer(
-                    duration: const Duration(milliseconds: 180),
-                    height: 4,
-                    width: 58,
-                    decoration: BoxDecoration(
-                      color: selected ? AppColors.primary : Colors.transparent,
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Icon(
-                    item.$1,
-                    color: selected ? AppColors.primary : Colors.black87,
-                    size: 28,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    item.$2,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
-                      color: selected ? AppColors.primary : Colors.black87,
-                    ),
-                  ),
-                ],
-              ),
+    return SafeArea(
+      top: false,
+      child: Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          boxShadow: [
+            BoxShadow(
+              color: Color(0x22000000),
+              blurRadius: 10,
+              offset: Offset(0, -2),
             ),
-          );
-        }),
+          ],
+        ),
+        padding: const EdgeInsets.only(top: 6, bottom: 8),
+        child: Row(
+          children: List.generate(items.length, (index) {
+            final item = items[index];
+            final selected = index == currentIndex;
+
+            return Expanded(
+              child: InkWell(
+                onTap: () => onTap(index),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
+                      height: 4,
+                      width: 58,
+                      decoration: BoxDecoration(
+                        color: selected ? AppColors.primary : Colors.transparent,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Icon(
+                      item.$1,
+                      color: selected ? AppColors.primary : Colors.black87,
+                      size: 28,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      item.$2,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+                        color: selected ? AppColors.primary : Colors.black87,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }),
+        ),
       ),
     );
   }

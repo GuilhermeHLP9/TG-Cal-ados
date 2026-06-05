@@ -67,6 +67,7 @@ class OrderStore extends ChangeNotifier {
   }
 
   Future<void> addOrder({
+    String? customerId,
     required String productName,
     required String sizes,
     required String materials,
@@ -82,6 +83,7 @@ class OrderStore extends ChangeNotifier {
     if (apiClient != null && token != null) {
       final order = await apiClient.createOrder(
         token: token,
+        customerId: customerId,
         productName: productName,
         sizes: sizes,
         materials: materials,
@@ -103,6 +105,7 @@ class OrderStore extends ChangeNotifier {
       0,
       Order(
         id: nextId,
+        customerId: customerId,
         clientName: 'Cliente',
         productName: productName,
         sizes: sizes,
@@ -136,6 +139,36 @@ class OrderStore extends ChangeNotifier {
       );
     } else {
       _orders[index] = _orders[index].copyWith(status: status);
+    }
+
+    notifyListeners();
+  }
+
+  Future<void> updateFinancial({
+    required String orderId,
+    required double materialCost,
+  }) async {
+    final apiClient = _apiClient;
+    final token = _token;
+    final index = _orders.indexWhere((order) => order.id == orderId);
+
+    if (index == -1) {
+      return;
+    }
+
+    if (apiClient != null && token != null) {
+      _orders[index] = await apiClient.updateOrderFinancial(
+        token: token,
+        orderId: orderId,
+        materialCost: materialCost,
+      );
+    } else {
+      final order = _orders[index];
+      _orders[index] = order.copyWith(
+        materialCost: materialCost,
+        apiTotalPrice: order.totalPrice,
+        profit: order.totalPrice - materialCost,
+      );
     }
 
     notifyListeners();

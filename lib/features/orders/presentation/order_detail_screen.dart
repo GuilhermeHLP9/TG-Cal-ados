@@ -65,6 +65,8 @@ class OrderDetailScreen extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 18),
+                  _ProgressTracker(status: order.status),
+                  const SizedBox(height: 18),
                   _InfoLine(label: 'Cliente', value: order.clientName),
                   _InfoLine(label: 'Tipo de sola', value: order.productName),
                   _InfoLine(label: 'Tamanhos', value: order.sizes),
@@ -76,6 +78,10 @@ class OrderDetailScreen extends StatelessWidget {
                   _InfoLine(
                     label: 'Preco por par',
                     value: 'R\$ ${order.pricePerPair.toStringAsFixed(2)}',
+                  ),
+                  _InfoLine(
+                    label: 'Total',
+                    value: 'R\$ ${order.totalPrice.toStringAsFixed(2)}',
                   ),
                   _InfoLine(label: 'Entrega', value: order.dueDate),
                   if (order.referencePhoto != null &&
@@ -94,6 +100,8 @@ class OrderDetailScreen extends StatelessWidget {
               ),
             ),
             if (canManage) ...[
+              const SizedBox(height: 16),
+              _FinancialCard(order: order, store: store),
               const SizedBox(height: 16),
               AppCard(
                 child: Column(
@@ -193,6 +201,320 @@ class OrderDetailScreen extends StatelessWidget {
         );
       }
     }
+  }
+}
+
+class _FinancialCard extends StatefulWidget {
+  const _FinancialCard({
+    required this.order,
+    required this.store,
+  });
+
+  final Order order;
+  final OrderStore store;
+
+  @override
+  State<_FinancialCard> createState() => _FinancialCardState();
+}
+
+class _FinancialCardState extends State<_FinancialCard> {
+  late final TextEditingController _materialCostController;
+  bool _isSaving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _materialCostController = TextEditingController(
+      text: widget.order.materialCost?.toStringAsFixed(2).replaceAll('.', ',') ?? '',
+    );
+  }
+
+  @override
+  void didUpdateWidget(covariant _FinancialCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.order.id != widget.order.id ||
+        oldWidget.order.materialCost != widget.order.materialCost) {
+      _materialCostController.text =
+          widget.order.materialCost?.toStringAsFixed(2).replaceAll('.', ',') ?? '';
+    }
+  }
+
+  @override
+  void dispose() {
+    _materialCostController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cost = double.tryParse(
+          _materialCostController.text.trim().replaceAll(',', '.'),
+        ) ??
+        widget.order.materialCost ??
+        0;
+    final profit = widget.order.totalPrice - cost;
+    final margin = widget.order.totalPrice <= 0 ? 0 : profit / widget.order.totalPrice;
+
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text(
+            'Financeiro',
+            style: TextStyle(
+              color: AppColors.text,
+              fontSize: 20,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: _FinancialMetric(
+                  label: 'Total',
+                  value: 'R\$ ${widget.order.totalPrice.toStringAsFixed(2)}',
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _FinancialMetric(
+                  label: 'Lucro',
+                  value: 'R\$ ${profit.toStringAsFixed(2)}',
+                  danger: profit < 0,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _FinancialMetric(
+                  label: 'Margem',
+                  value: '${(margin * 100).toStringAsFixed(1)}%',
+                  danger: margin < 0,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          TextField(
+            controller: _materialCostController,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: const InputDecoration(
+              labelText: 'Custo de material',
+              prefixText: 'R\$ ',
+            ),
+            onChanged: (_) => setState(() {}),
+          ),
+          const SizedBox(height: 12),
+          ElevatedButton.icon(
+            onPressed: _isSaving ? null : _save,
+            icon: _isSaving
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.save_outlined),
+            label: Text(_isSaving ? 'Salvando...' : 'Salvar financeiro'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _save() async {
+    final materialCost = double.tryParse(
+      _materialCostController.text.trim().replaceAll(',', '.'),
+    );
+
+    if (materialCost == null || materialCost < 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Informe um custo valido.')),
+      );
+      return;
+    }
+
+    setState(() => _isSaving = true);
+
+    try {
+      await widget.store.updateFinancial(
+        orderId: widget.order.id,
+        materialCost: materialCost,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Financeiro atualizado.')),
+      );
+    } on ApiException catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.message)),
+      );
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Nao foi possivel salvar o financeiro.')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
+    }
+  }
+}
+
+class _FinancialMetric extends StatelessWidget {
+  const _FinancialMetric({
+    required this.label,
+    required this.value,
+    this.danger = false,
+  });
+
+  final String label;
+  final String value;
+  final bool danger;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: danger
+            ? AppColors.danger.withValues(alpha: 0.08)
+            : const Color(0xFFEAF3F7),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              color: AppColors.muted,
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: danger ? AppColors.danger : AppColors.primaryDark,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ProgressTracker extends StatelessWidget {
+  const _ProgressTracker({required this.status});
+
+  final OrderStatus status;
+
+  @override
+  Widget build(BuildContext context) {
+    final steps = [
+      (OrderStatus.recebido, 'Recebido', Icons.inbox_outlined),
+      (OrderStatus.novo, 'Aceito', Icons.playlist_add_check),
+      (OrderStatus.emProducao, 'Producao', Icons.precision_manufacturing_outlined),
+      (OrderStatus.paraEntrega, 'Entrega', Icons.local_shipping_outlined),
+    ];
+    final current = _statusStep(status);
+    final refused = status == OrderStatus.recusado;
+
+    if (refused) {
+      return Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: AppColors.danger.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.danger.withValues(alpha: 0.24)),
+        ),
+        child: const Row(
+          children: [
+            Icon(Icons.block, color: AppColors.danger),
+            SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Pedido recusado pelo fornecedor.',
+                style: TextStyle(
+                  color: AppColors.danger,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Row(
+      children: List.generate(steps.length, (index) {
+        final step = steps[index];
+        final done = index <= current;
+
+        return Expanded(
+          child: Column(
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: done ? AppColors.primary : AppColors.border,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  step.$3,
+                  size: 18,
+                  color: done ? Colors.white : AppColors.muted,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                step.$2,
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: done ? AppColors.primaryDark : AppColors.muted,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+        );
+      }),
+    );
+  }
+}
+
+int _statusStep(OrderStatus status) {
+  switch (status) {
+    case OrderStatus.recebido:
+      return 0;
+    case OrderStatus.novo:
+      return 1;
+    case OrderStatus.emProducao:
+      return 2;
+    case OrderStatus.paraEntrega:
+      return 3;
+    case OrderStatus.recusado:
+      return -1;
   }
 }
 

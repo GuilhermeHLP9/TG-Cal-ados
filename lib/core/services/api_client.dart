@@ -105,6 +105,7 @@ class ApiClient {
 
   Future<Order> createOrder({
     required String token,
+    String? customerId,
     required String productName,
     required String sizes,
     required String materials,
@@ -118,6 +119,8 @@ class ApiClient {
       '/orders',
       token: token,
       body: {
+        if (customerId != null && customerId.isNotEmpty)
+          'customerId': customerId,
         'productName': productName,
         'sizes': sizes,
         'materials': materials,
@@ -133,6 +136,51 @@ class ApiClient {
     return OrderDto.fromJson(response as Map<String, dynamic>).toOrder();
   }
 
+  Future<List<CustomerItem>> listCustomers(String token) async {
+    final response = await _get('/customers', token: token);
+    final items = response as List<dynamic>;
+    return items
+        .map((item) => CustomerItem.fromJson(item as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<CustomerItem> createCustomer({
+    required String token,
+    required String name,
+    String? cnpj,
+  }) async {
+    final response = await _post(
+      '/customers',
+      token: token,
+      body: {
+        'name': name,
+        if (cnpj != null && cnpj.trim().isNotEmpty) 'cnpj': cnpj,
+      },
+    );
+
+    return CustomerItem.fromJson(response as Map<String, dynamic>);
+  }
+
+  Future<CustomerItem> updateCustomer({
+    required String token,
+    required String id,
+    String? name,
+    String? cnpj,
+  }) async {
+    final response = await _patch(
+      '/customers/$id',
+      token: token,
+      body: {
+        ...?name != null && name.trim().isNotEmpty
+            ? {'name': name.trim()}
+            : null,
+        ...?cnpj != null ? {'cnpj': cnpj} : null,
+      },
+    );
+
+    return CustomerItem.fromJson(response as Map<String, dynamic>);
+  }
+
   Future<Order> updateOrderStatus({
     required String token,
     required String orderId,
@@ -142,6 +190,20 @@ class ApiClient {
       '/orders/$orderId/status',
       token: token,
       body: {'status': status.toApiValue()},
+    );
+
+    return OrderDto.fromJson(response as Map<String, dynamic>).toOrder();
+  }
+
+  Future<Order> updateOrderFinancial({
+    required String token,
+    required String orderId,
+    required double materialCost,
+  }) async {
+    final response = await _patch(
+      '/orders/$orderId/financial',
+      token: token,
+      body: {'materialCost': materialCost},
     );
 
     return OrderDto.fromJson(response as Map<String, dynamic>).toOrder();
@@ -292,6 +354,26 @@ class ApiClient {
   }
 }
 
+class CustomerItem {
+  const CustomerItem({
+    required this.id,
+    required this.name,
+    this.cnpj,
+  });
+
+  final String id;
+  final String name;
+  final String? cnpj;
+
+  factory CustomerItem.fromJson(Map<String, dynamic> json) {
+    return CustomerItem(
+      id: json['id'] as String,
+      name: json['name'] as String,
+      cnpj: json['cnpj'] as String?,
+    );
+  }
+}
+
 class NoteItem {
   const NoteItem({
     required this.id,
@@ -403,6 +485,7 @@ class AuthCompany {
 class OrderDto {
   const OrderDto({
     required this.id,
+    this.customerId,
     required this.clientName,
     required this.productName,
     required this.sizes,
@@ -411,11 +494,15 @@ class OrderDto {
     required this.pricePerPair,
     required this.dueDate,
     required this.status,
+    this.materialCost,
+    this.totalPrice,
+    this.profit,
     this.referencePhoto,
     this.notes,
   });
 
   final String id;
+  final String? customerId;
   final String clientName;
   final String productName;
   final String sizes;
@@ -424,15 +511,22 @@ class OrderDto {
   final double pricePerPair;
   final String dueDate;
   final OrderStatus status;
+  final double? materialCost;
+  final double? totalPrice;
+  final double? profit;
   final String? referencePhoto;
   final String? notes;
 
   factory OrderDto.fromJson(Map<String, dynamic> json) {
+    final customer = json['customer'] as Map<String, dynamic>?;
     final client = json['client'] as Map<String, dynamic>?;
 
     return OrderDto(
       id: json['id'] as String,
-      clientName: client?['name']?.toString() ?? 'Cliente',
+      customerId: customer?['id']?.toString(),
+      clientName: customer?['name']?.toString() ??
+          client?['name']?.toString() ??
+          'Cliente',
       productName: json['productName'] as String,
       sizes: json['sizes'] as String,
       materials: json['materials'] as String,
@@ -440,6 +534,9 @@ class OrderDto {
       pricePerPair: _toDouble(json['pricePerPair']),
       dueDate: _formatApiDate(json['dueDate'] as String),
       status: orderStatusFromApi(json['status'] as String),
+      materialCost: _optionalDouble(json['materialCost']),
+      totalPrice: _optionalDouble(json['totalPrice']),
+      profit: _optionalDouble(json['profit']),
       referencePhoto: json['referencePhoto'] as String?,
       notes: json['notes'] as String?,
     );
@@ -448,6 +545,7 @@ class OrderDto {
   Order toOrder() {
     return Order(
       id: id,
+      customerId: customerId,
       clientName: clientName,
       productName: productName,
       sizes: sizes,
@@ -456,6 +554,9 @@ class OrderDto {
       pricePerPair: pricePerPair,
       dueDate: dueDate,
       status: status,
+      materialCost: materialCost,
+      apiTotalPrice: totalPrice,
+      profit: profit,
       referencePhoto: referencePhoto,
       notes: notes,
     );
@@ -467,6 +568,14 @@ class OrderDto {
     }
 
     return double.parse(value.toString());
+  }
+
+  static double? _optionalDouble(dynamic value) {
+    if (value == null) {
+      return null;
+    }
+
+    return _toDouble(value);
   }
 
   static String _formatApiDate(String value) {

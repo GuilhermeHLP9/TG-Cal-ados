@@ -10,9 +10,11 @@ class CreateOrderScreen extends StatefulWidget {
   const CreateOrderScreen({
     super.key,
     required this.store,
+    this.customers = const [],
   });
 
   final OrderStore store;
+  final List<CustomerItem> customers;
 
   @override
   State<CreateOrderScreen> createState() => _CreateOrderScreenState();
@@ -28,7 +30,15 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
   final _priceController = TextEditingController();
   final _dateController = TextEditingController();
   final _notesController = TextEditingController();
+  String? _selectedCustomerId;
   bool _isSubmitting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedCustomerId =
+        widget.customers.isEmpty ? null : widget.customers.first.id;
+  }
 
   @override
   void dispose() {
@@ -56,18 +66,34 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
         child: ListView(
           padding: const EdgeInsets.all(20),
           children: [
+            const _CreateOrderHeader(),
+            const SizedBox(height: 16),
             Form(
               key: _formKey,
               child: AppCard(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    if (widget.customers.isNotEmpty) ...[
+                      _CustomerSelector(
+                        customers: widget.customers,
+                        value: _selectedCustomerId,
+                        onChanged: (value) {
+                          setState(() => _selectedCustomerId = value);
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                    ],
                     _Field(
                       label: 'Tipo de sola',
                       hint: 'Ex.: Casual, Runner, Street',
                       controller: _soleTypeController,
                       validator: _required,
                     ),
+                    _QuickSizeChips(
+                      onSelected: (value) => _sizesController.text = value,
+                    ),
+                    const SizedBox(height: 4),
                     _Field(
                       label: 'Tamanhos / numeracao',
                       hint: 'Ex.: 34 ao 40, grade 36/37/38',
@@ -102,6 +128,11 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
                       keyboardType: TextInputType.number,
                       validator: _positiveMoney,
                     ),
+                    _OrderTotalPreview(
+                      quantityController: _quantityController,
+                      priceController: _priceController,
+                    ),
+                    const SizedBox(height: 10),
                     _Field(
                       label: 'Data de entrega desejada',
                       hint: 'Ex.: 20/06/2026',
@@ -117,10 +148,15 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
                       maxLines: 4,
                     ),
                     const SizedBox(height: 8),
-                    ElevatedButton.icon(
-                      onPressed: _isSubmitting ? null : _submit,
-                      icon: const Icon(Icons.send),
-                      label: Text(_isSubmitting ? 'Enviando...' : 'Enviar pedido'),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: _isSubmitting ? null : _submit,
+                        icon: const Icon(Icons.send),
+                        label: Text(
+                          _isSubmitting ? 'Enviando...' : 'Revisar e enviar',
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -137,15 +173,33 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
       return;
     }
 
+    final customerId = _selectedCustomerId;
+
+    if (widget.customers.isNotEmpty && customerId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Selecione um cliente para o pedido.')),
+      );
+      return;
+    }
+
     setState(() => _isSubmitting = true);
 
     final quantity = int.parse(_quantityController.text.trim());
     final price = double.parse(
       _priceController.text.trim().replaceAll(',', '.'),
     );
+    final shouldSubmit = await _showReview(quantity: quantity, price: price);
+
+    if (!shouldSubmit || !mounted) {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
+      return;
+    }
 
     try {
       await widget.store.addOrder(
+        customerId: customerId,
         productName: _soleTypeController.text.trim(),
         sizes: _sizesController.text.trim(),
         materials: _materialsController.text.trim(),
@@ -186,6 +240,88 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
     );
 
     Navigator.of(context).pop();
+  }
+
+  Future<bool> _showReview({
+    required int quantity,
+    required double price,
+  }) async {
+    final total = quantity * price;
+
+    return await showModalBottomSheet<bool>(
+          context: context,
+          showDragHandle: true,
+          builder: (context) {
+            return SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Revisar pedido',
+                      style: TextStyle(
+                        color: AppColors.text,
+                        fontSize: 24,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    if (widget.customers.isNotEmpty)
+                      _ReviewLine(
+                        label: 'Cliente',
+                        value: _selectedCustomer?.name ?? 'Cliente',
+                      ),
+                    _ReviewLine(label: 'Tipo de sola', value: _soleTypeController.text),
+                    _ReviewLine(label: 'Tamanhos', value: _sizesController.text),
+                    _ReviewLine(label: 'Materiais', value: _materialsController.text),
+                    _ReviewLine(label: 'Quantidade', value: '$quantity pares'),
+                    _ReviewLine(label: 'Preco por par', value: 'R\$ ${price.toStringAsFixed(2)}'),
+                    _ReviewLine(label: 'Total estimado', value: 'R\$ ${total.toStringAsFixed(2)}'),
+                    _ReviewLine(label: 'Entrega', value: _dateController.text),
+                    const SizedBox(height: 14),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () => Navigator.of(context).pop(false),
+                            child: const Text('Editar'),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: () => Navigator.of(context).pop(true),
+                            child: const Text('Confirmar'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        ) ??
+        false;
+  }
+
+  CustomerItem? get _selectedCustomer {
+    final id = _selectedCustomerId;
+
+    if (id == null) {
+      return null;
+    }
+
+    for (final customer in widget.customers) {
+      if (customer.id == id) {
+        return customer;
+      }
+    }
+
+    return null;
   }
 
   String? _required(String? value) {
@@ -243,6 +379,78 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
   }
 }
 
+class _CreateOrderHeader extends StatelessWidget {
+  const _CreateOrderHeader();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Criar pedido',
+          style: TextStyle(
+            color: AppColors.text,
+            fontSize: 28,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        SizedBox(height: 6),
+        Text(
+          'Escolha o cliente e informe os detalhes do solado para producao.',
+          style: TextStyle(
+            color: AppColors.muted,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _CustomerSelector extends StatelessWidget {
+  const _CustomerSelector({
+    required this.customers,
+    required this.value,
+    required this.onChanged,
+  });
+
+  final List<CustomerItem> customers;
+  final String? value;
+  final ValueChanged<String?> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return DropdownButtonFormField<String>(
+      initialValue: value,
+      items: customers
+          .map(
+            (customer) => DropdownMenuItem(
+              value: customer.id,
+              child: Text(
+                customer.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          )
+          .toList(),
+      onChanged: onChanged,
+      validator: (value) {
+        if (value == null || value.isEmpty) {
+          return 'Selecione um cliente.';
+        }
+
+        return null;
+      },
+      decoration: const InputDecoration(
+        labelText: 'Cliente',
+        prefixIcon: Icon(Icons.storefront),
+      ),
+    );
+  }
+}
+
 class _Field extends StatelessWidget {
   const _Field({
     required this.label,
@@ -285,6 +493,141 @@ class _Field extends StatelessWidget {
                 validator: validator,
                 decoration: InputDecoration(hintText: hint),
               ),
+        ],
+      ),
+    );
+  }
+}
+
+class _QuickSizeChips extends StatelessWidget {
+  const _QuickSizeChips({required this.onSelected});
+
+  final ValueChanged<String> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    const options = ['33 ao 38', '34 ao 40', '36 ao 42', '38 ao 44'];
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: options
+            .map(
+              (option) => ActionChip(
+                label: Text(option),
+                onPressed: () => onSelected(option),
+                avatar: const Icon(Icons.straighten, size: 18),
+              ),
+            )
+            .toList(),
+      ),
+    );
+  }
+}
+
+class _OrderTotalPreview extends StatefulWidget {
+  const _OrderTotalPreview({
+    required this.quantityController,
+    required this.priceController,
+  });
+
+  final TextEditingController quantityController;
+  final TextEditingController priceController;
+
+  @override
+  State<_OrderTotalPreview> createState() => _OrderTotalPreviewState();
+}
+
+class _OrderTotalPreviewState extends State<_OrderTotalPreview> {
+  @override
+  void initState() {
+    super.initState();
+    widget.quantityController.addListener(_sync);
+    widget.priceController.addListener(_sync);
+  }
+
+  @override
+  void dispose() {
+    widget.quantityController.removeListener(_sync);
+    widget.priceController.removeListener(_sync);
+    super.dispose();
+  }
+
+  void _sync() => setState(() {});
+
+  @override
+  Widget build(BuildContext context) {
+    final quantity = int.tryParse(widget.quantityController.text.trim()) ?? 0;
+    final price = double.tryParse(
+          widget.priceController.text.trim().replaceAll(',', '.'),
+        ) ??
+        0;
+    final total = quantity * price;
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEAF3F7),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.payments_outlined, color: AppColors.primary),
+          const SizedBox(width: 10),
+          const Expanded(
+            child: Text(
+              'Total estimado',
+              style: TextStyle(fontWeight: FontWeight.w800),
+            ),
+          ),
+          Text(
+            'R\$ ${total.toStringAsFixed(2)}',
+            style: const TextStyle(
+              color: AppColors.primaryDark,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ReviewLine extends StatelessWidget {
+  const _ReviewLine({
+    required this.label,
+    required this.value,
+  });
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 120,
+            child: Text(
+              label,
+              style: const TextStyle(
+                color: AppColors.muted,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+          ),
         ],
       ),
     );

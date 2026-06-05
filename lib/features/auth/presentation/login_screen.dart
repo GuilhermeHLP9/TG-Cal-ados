@@ -15,7 +15,7 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _emailController = TextEditingController(text: 'cliente@calcados.com');
+  final _emailController = TextEditingController(text: 'dono@calcados.com');
   final _passwordController = TextEditingController(text: '123456');
   final _apiClient = ApiClient();
   bool _isLoading = false;
@@ -85,7 +85,7 @@ class _LoginScreenState extends State<LoginScreen> {
             const SectionHeading(
               title: 'Solex',
               subtitle:
-                  'Sistema de gestao de pedidos para empresa calcadista com acesso para cliente e proprietario.',
+                  'Sistema de gestao de pedidos com acesso para clientes e proprietario.',
             ),
             const SizedBox(height: 24),
             AppCard(
@@ -121,7 +121,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             );
                           },
                     icon: const Icon(Icons.person_add_alt_1),
-                    label: const Text('Criar conta'),
+                    label: const Text('Criar conta de cliente'),
                   ),
                   if (_error != null) ...[
                     const SizedBox(height: 12),
@@ -146,9 +146,9 @@ class _LoginScreenState extends State<LoginScreen> {
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
                   ),
                   SizedBox(height: 8),
-                  Text('Use dono@calcados.com / 123456 para o proprietario.'),
+                  Text('Use dono@calcados.com / 123456 para entrar.'),
                   SizedBox(height: 4),
-                  Text('Use cliente@calcados.com / 123456 para o cliente.'),
+                  Text('Novas contas criadas aqui entram como cliente.'),
                 ],
               ),
             ),
