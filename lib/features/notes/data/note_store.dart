@@ -3,6 +3,11 @@ import 'package:flutter/material.dart';
 import '../../../core/services/api_client.dart';
 
 class NoteStore extends ChangeNotifier {
+  NoteStore.demo()
+      : _apiClient = ApiClient(),
+        _token = '',
+        _notes = [];
+
   NoteStore({
     required ApiClient apiClient,
     required String token,

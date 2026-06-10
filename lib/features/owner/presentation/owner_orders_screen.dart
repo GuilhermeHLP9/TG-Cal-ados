@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../../../core/models/order.dart';
 import '../../../core/services/api_client.dart';
 import '../../../core/theme/app_theme.dart';
-import '../../client/presentation/create_order_screen.dart';
 import '../../customers/data/customer_store.dart';
 import '../../orders/data/order_store.dart';
 import '../../orders/presentation/order_detail_screen.dart';
@@ -83,7 +82,6 @@ class _OwnerOrdersScreenState extends State<OwnerOrdersScreen> {
             visibleOrders: filteredOrders.length,
             isLoading: store.isLoading,
             onRefresh: store.loadOrders,
-            onCreate: () => _openCreateOrder(store),
           ),
           if (store.error != null) ...[
             const SizedBox(height: 12),
@@ -119,7 +117,21 @@ class _OwnerOrdersScreenState extends State<OwnerOrdersScreen> {
                   onOpen: () => _openDetail(store, order),
                   onAdvance: _nextStatus(order) == null
                       ? null
-                      : () => _advanceOrder(store, order),
+                      : () => _changeOrderStatus(
+                            store,
+                            order,
+                            _nextStatus(order)!,
+                          ),
+                  onBack: _previousStatus(order) == null
+                      ? null
+                      : () => _changeOrderStatus(
+                            store,
+                            order,
+                            _previousStatus(order)!,
+                          ),
+                  onReject: order.status == OrderStatus.recebido
+                      ? () => _rejectOrder(store, order)
+                      : null,
                 ),
               ),
             ),
@@ -152,51 +164,25 @@ class _OwnerOrdersScreenState extends State<OwnerOrdersScreen> {
     );
   }
 
-  Future<void> _openCreateOrder(OrderStore store) async {
-    if (widget.customerStore.customers.isEmpty &&
-        !widget.customerStore.isLoading) {
-      await widget.customerStore.loadCustomers();
-    }
-
-    if (!mounted) {
-      return;
-    }
-
-    if (widget.customerStore.customers.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Cadastre um cliente antes de criar pedidos.'),
-        ),
-      );
-      return;
-    }
-
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => CreateOrderScreen(
-          store: store,
-          customers: widget.customerStore.customers,
-        ),
-      ),
-    );
-  }
-
-  Future<void> _advanceOrder(OrderStore store, Order order) async {
-    final nextStatus = _nextStatus(order);
-
-    if (nextStatus == null) {
-      return;
-    }
-
+  Future<void> _changeOrderStatus(
+    OrderStore store,
+    Order order,
+    OrderStatus status, {
+    String? refusalReason,
+  }) async {
     try {
-      await store.updateStatus(order.id, nextStatus);
+      await store.updateStatus(
+        order.id,
+        status,
+        refusalReason: refusalReason,
+      );
 
       if (!mounted) {
         return;
       }
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Pedido atualizado para ${_statusLabel(nextStatus)}.')),
+        SnackBar(content: Text('Pedido atualizado para ${_statusLabel(status)}.')),
       );
     } on ApiException catch (error) {
       if (!mounted) {
@@ -215,6 +201,61 @@ class _OwnerOrdersScreenState extends State<OwnerOrdersScreen> {
         const SnackBar(content: Text('Nao foi possivel atualizar o pedido.')),
       );
     }
+  }
+
+  Future<void> _rejectOrder(OrderStore store, Order order) async {
+    final reason = await _askRefusalReason();
+
+    if (reason == null) {
+      return;
+    }
+
+    await _changeOrderStatus(
+      store,
+      order,
+      OrderStatus.recusado,
+      refusalReason: reason,
+    );
+  }
+
+  Future<String?> _askRefusalReason() async {
+    final controller = TextEditingController();
+
+    final reason = await showDialog<String>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Motivo da recusa'),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            maxLines: 4,
+            decoration: const InputDecoration(
+              hintText: 'Explique para o cliente por que o pedido foi recusado',
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final value = controller.text.trim();
+                if (value.length < 3) {
+                  return;
+                }
+                Navigator.of(context).pop(value);
+              },
+              child: const Text('Recusar'),
+            ),
+          ],
+        );
+      },
+    );
+
+    controller.dispose();
+    return reason;
   }
 
   List<Order> _filterAndSortOrders(List<Order> orders) {
@@ -240,7 +281,8 @@ class _OwnerOrdersScreenState extends State<OwnerOrdersScreen> {
         return true;
       }
 
-      return order.id.toLowerCase().contains(search) ||
+      return order.displayCode.toLowerCase().contains(search) ||
+          order.id.toLowerCase().contains(search) ||
           order.clientName.toLowerCase().contains(search) ||
           order.productName.toLowerCase().contains(search);
     }).toList();
@@ -272,6 +314,21 @@ class _OwnerOrdersScreenState extends State<OwnerOrdersScreen> {
       case OrderStatus.paraEntrega:
       case OrderStatus.recusado:
         return null;
+    }
+  }
+
+  OrderStatus? _previousStatus(Order order) {
+    switch (order.status) {
+      case OrderStatus.recebido:
+        return null;
+      case OrderStatus.novo:
+        return OrderStatus.recebido;
+      case OrderStatus.emProducao:
+        return OrderStatus.novo;
+      case OrderStatus.paraEntrega:
+        return OrderStatus.emProducao;
+      case OrderStatus.recusado:
+        return OrderStatus.recebido;
     }
   }
 }
@@ -344,14 +401,15 @@ class _FinancialSummaryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     final color = danger ? AppColors.danger : AppColors.primary;
 
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: colors.surface,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: colors.outlineVariant),
       ),
       child: Row(
         children: [
@@ -374,8 +432,8 @@ class _FinancialSummaryCard extends StatelessWidget {
                   label,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: AppColors.muted,
+                  style: TextStyle(
+                    color: colors.onSurfaceVariant,
                     fontSize: 12,
                     fontWeight: FontWeight.w800,
                   ),
@@ -386,7 +444,7 @@ class _FinancialSummaryCard extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: danger ? AppColors.danger : AppColors.text,
+                    color: danger ? AppColors.danger : colors.onSurface,
                     fontWeight: FontWeight.w900,
                   ),
                 ),
@@ -405,17 +463,17 @@ class _OrdersHeader extends StatelessWidget {
     required this.visibleOrders,
     required this.isLoading,
     required this.onRefresh,
-    required this.onCreate,
   });
 
   final int totalOrders;
   final int visibleOrders;
   final bool isLoading;
   final VoidCallback onRefresh;
-  final VoidCallback onCreate;
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -423,10 +481,10 @@ class _OrdersHeader extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 'Pedidos',
                 style: TextStyle(
-                  color: AppColors.text,
+                  color: colors.onSurface,
                   fontSize: 28,
                   fontWeight: FontWeight.w900,
                 ),
@@ -434,8 +492,8 @@ class _OrdersHeader extends StatelessWidget {
               const SizedBox(height: 4),
               Text(
                 '$visibleOrders exibidos de $totalOrders pedidos',
-                style: const TextStyle(
-                  color: AppColors.muted,
+                style: TextStyle(
+                  color: colors.onSurfaceVariant,
                   fontWeight: FontWeight.w700,
                 ),
               ),
@@ -444,12 +502,6 @@ class _OrdersHeader extends StatelessWidget {
         ),
         Column(
           children: [
-            IconButton.filled(
-              tooltip: 'Criar pedido',
-              onPressed: onCreate,
-              icon: const Icon(Icons.add),
-            ),
-            const SizedBox(height: 8),
             IconButton.filledTonal(
               tooltip: 'Atualizar pedidos',
               onPressed: isLoading ? null : onRefresh,
@@ -558,6 +610,8 @@ class _SearchAndSortBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
     return Row(
       children: [
         Expanded(
@@ -565,7 +619,7 @@ class _SearchAndSortBar extends StatelessWidget {
             controller: controller,
             onChanged: onSearchChanged,
             decoration: const InputDecoration(
-              hintText: 'Buscar por cliente, produto ou ID',
+              hintText: 'Buscar por cliente, produto ou numero',
               prefixIcon: Icon(Icons.search),
             ),
           ),
@@ -584,11 +638,11 @@ class _SearchAndSortBar extends StatelessWidget {
             height: 54,
             width: 54,
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: colors.surface,
               borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: AppColors.border),
+              border: Border.all(color: colors.outlineVariant),
             ),
-            child: const Icon(Icons.sort, color: AppColors.primary),
+            child: Icon(Icons.sort, color: colors.primary),
           ),
         ),
       ],
@@ -601,16 +655,22 @@ class _OwnerOrderCard extends StatelessWidget {
     required this.order,
     required this.onOpen,
     required this.onAdvance,
+    required this.onBack,
+    required this.onReject,
   });
 
   final Order order;
   final VoidCallback onOpen;
   final VoidCallback? onAdvance;
+  final VoidCallback? onBack;
+  final VoidCallback? onReject;
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
     return Material(
-      color: AppColors.surface,
+      color: colors.surface,
       borderRadius: BorderRadius.circular(14),
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
@@ -619,7 +679,7 @@ class _OwnerOrderCard extends StatelessWidget {
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: AppColors.border),
+            border: Border.all(color: colors.outlineVariant),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -635,8 +695,8 @@ class _OwnerOrderCard extends StatelessWidget {
                           order.productName,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: AppColors.text,
+                          style: TextStyle(
+                            color: colors.onSurface,
                             fontSize: 19,
                             fontWeight: FontWeight.w900,
                           ),
@@ -646,8 +706,8 @@ class _OwnerOrderCard extends StatelessWidget {
                           order.clientName,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: AppColors.muted,
+                          style: TextStyle(
+                            color: colors.onSurfaceVariant,
                             fontWeight: FontWeight.w700,
                           ),
                         ),
@@ -665,7 +725,7 @@ class _OwnerOrderCard extends StatelessWidget {
                 children: [
                   _MetricPill(
                     icon: Icons.confirmation_number_outlined,
-                    label: _shortId(order.id),
+                    label: order.displayCode,
                   ),
                   _MetricPill(
                     icon: Icons.inventory_2_outlined,
@@ -687,30 +747,105 @@ class _OwnerOrderCard extends StatelessWidget {
                   order.notes!,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: AppColors.muted),
+                  style: TextStyle(color: colors.onSurfaceVariant),
                 ),
               ],
               const SizedBox(height: 14),
-              Row(
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  TextButton.icon(
-                    onPressed: onOpen,
-                    icon: const Icon(Icons.visibility_outlined),
-                    label: const Text('Detalhes'),
-                  ),
-                  const Spacer(),
-                  if (onAdvance != null)
-                    FilledButton.tonalIcon(
-                      onPressed: onAdvance,
-                      icon: const Icon(Icons.arrow_forward),
-                      label: Text(_advanceLabel(order.status)),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      onPressed: onOpen,
+                      icon: const Icon(Icons.visibility_outlined),
+                      label: const Text('Detalhes'),
                     ),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    alignment: WrapAlignment.end,
+                    spacing: 10,
+                    runSpacing: 10,
+                    children: [
+                      if (onBack != null)
+                        _CardStatusButton(
+                          onPressed: onBack,
+                          icon: const Icon(Icons.arrow_back),
+                          label: Text(
+                            _backLabel(order.status),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      if (onReject != null)
+                        _CardStatusButton(
+                          onPressed: onReject,
+                          icon: const Icon(Icons.block),
+                          label: const Text('Recusar'),
+                        ),
+                      if (onAdvance != null)
+                        _CardStatusButton(
+                          onPressed: onAdvance,
+                          icon: const Icon(Icons.arrow_forward),
+                          label: Text(
+                            _advanceLabel(order.status),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          filled: true,
+                        ),
+                    ],
+                  ),
                 ],
               ),
             ],
           ),
         ),
       ),
+    );
+  }
+}
+
+class _CardStatusButton extends StatelessWidget {
+  const _CardStatusButton({
+    required this.onPressed,
+    required this.icon,
+    required this.label,
+    this.filled = false,
+  });
+
+  final VoidCallback? onPressed;
+  final Widget icon;
+  final Widget label;
+  final bool filled;
+
+  @override
+  Widget build(BuildContext context) {
+    final style = ButtonStyle(
+      fixedSize: const WidgetStatePropertyAll(Size(168, 44)),
+      minimumSize: const WidgetStatePropertyAll(Size(168, 44)),
+      maximumSize: const WidgetStatePropertyAll(Size(168, 44)),
+      padding: const WidgetStatePropertyAll(
+        EdgeInsets.symmetric(horizontal: 12),
+      ),
+      visualDensity: VisualDensity.compact,
+    );
+
+    if (filled) {
+      return FilledButton.tonalIcon(
+        onPressed: onPressed,
+        icon: icon,
+        label: label,
+        style: style,
+      );
+    }
+
+    return OutlinedButton.icon(
+      onPressed: onPressed,
+      icon: icon,
+      label: label,
+      style: style,
     );
   }
 }
@@ -726,21 +861,23 @@ class _MetricPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
       decoration: BoxDecoration(
-        color: const Color(0xFFEAF3F7),
+        color: colors.primary.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(999),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, color: AppColors.primary, size: 16),
+          Icon(icon, color: colors.primary, size: 16),
           const SizedBox(width: 6),
           Text(
             label,
-            style: const TextStyle(
-              color: AppColors.primaryDark,
+            style: TextStyle(
+              color: colors.primary,
               fontSize: 12,
               fontWeight: FontWeight.w800,
             ),
@@ -791,8 +928,10 @@ class _StatusFilterCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
     return Material(
-      color: selected ? AppColors.primary : Colors.white,
+      color: selected ? colors.primary : colors.surface,
       borderRadius: BorderRadius.circular(14),
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
@@ -803,7 +942,7 @@ class _StatusFilterCard extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
-              color: selected ? AppColors.primary : AppColors.border,
+              color: selected ? colors.primary : colors.outlineVariant,
             ),
           ),
           child: Column(
@@ -813,14 +952,14 @@ class _StatusFilterCard extends StatelessWidget {
                 children: [
                   Icon(
                     item.icon,
-                    color: selected ? Colors.white : AppColors.primary,
+                    color: selected ? colors.onPrimary : colors.primary,
                     size: 22,
                   ),
                   const Spacer(),
                   Text(
                     item.count.toString(),
                     style: TextStyle(
-                      color: selected ? Colors.white : AppColors.primaryDark,
+                      color: selected ? colors.onPrimary : colors.primary,
                       fontSize: 22,
                       fontWeight: FontWeight.w900,
                     ),
@@ -833,7 +972,7 @@ class _StatusFilterCard extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  color: selected ? Colors.white : AppColors.text,
+                  color: selected ? colors.onPrimary : colors.onSurface,
                   fontWeight: FontWeight.w800,
                 ),
               ),
@@ -870,12 +1009,14 @@ class _EmptyOrders extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
     return Container(
       padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: colors.surface,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: colors.outlineVariant),
       ),
       child: Column(
         children: [
@@ -970,14 +1111,6 @@ class _OrdersError extends StatelessWidget {
   }
 }
 
-String _shortId(String id) {
-  if (id.length <= 8) {
-    return id;
-  }
-
-  return id.substring(0, 8);
-}
-
 String _statusLabel(OrderStatus status) {
   switch (status) {
     case OrderStatus.recebido:
@@ -990,6 +1123,21 @@ String _statusLabel(OrderStatus status) {
       return 'Entrega';
     case OrderStatus.recusado:
       return 'Recusado';
+  }
+}
+
+String _backLabel(OrderStatus status) {
+  switch (status) {
+    case OrderStatus.novo:
+      return 'Recebido';
+    case OrderStatus.emProducao:
+      return 'Novo';
+    case OrderStatus.paraEntrega:
+      return 'Producao';
+    case OrderStatus.recusado:
+      return 'Reabrir';
+    case OrderStatus.recebido:
+      return '';
   }
 }
 

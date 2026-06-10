@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/models/order.dart';
 import '../../../core/services/api_client.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/image_data.dart';
 import '../../../core/widgets/app_card.dart';
 import '../data/order_store.dart';
 
@@ -24,7 +25,7 @@ class OrderDetailScreen extends StatelessWidget {
 
     if (order == null) {
       return Scaffold(
-        backgroundColor: const Color(0xFFF0F3F4),
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         appBar: AppBar(
           title: const Text('Pedido'),
           backgroundColor: AppColors.primary,
@@ -37,9 +38,9 @@ class OrderDetailScreen extends StatelessWidget {
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF0F3F4),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        title: Text(order.id),
+        title: Text('Pedido ${order.displayCode}'),
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
       ),
@@ -67,6 +68,7 @@ class OrderDetailScreen extends StatelessWidget {
                   const SizedBox(height: 18),
                   _ProgressTracker(status: order.status),
                   const SizedBox(height: 18),
+                  _InfoLine(label: 'Pedido', value: order.displayCode),
                   _InfoLine(label: 'Cliente', value: order.clientName),
                   _InfoLine(label: 'Tipo de sola', value: order.productName),
                   _InfoLine(label: 'Tamanhos', value: order.sizes),
@@ -96,6 +98,11 @@ class OrderDetailScreen extends StatelessWidget {
                     const SizedBox(height: 8),
                     Text(order.notes!),
                   ],
+                  if (order.refusalReason != null &&
+                      order.refusalReason!.isNotEmpty) ...[
+                    const SizedBox(height: 14),
+                    _RefusalReason(reason: order.refusalReason!),
+                  ],
                 ],
               ),
             ),
@@ -123,25 +130,41 @@ class OrderDetailScreen extends StatelessWidget {
   ) {
     if (order.status == OrderStatus.recebido) {
       return [
-        ElevatedButton(
+        _StatusActionButton(
+          label: 'Aceitar pedido',
+          filled: true,
           onPressed: () async {
             await _updateStatus(context, store, order.id, OrderStatus.novo);
           },
-          child: const Text('Aceitar pedido'),
         ),
         const SizedBox(height: 10),
-        OutlinedButton(
+        _StatusActionButton(
+          label: 'Recusar pedido',
           onPressed: () async {
-            await _updateStatus(context, store, order.id, OrderStatus.recusado);
+            final reason = await _askRefusalReason(context);
+            if (reason == null) {
+              return;
+            }
+            if (!context.mounted) {
+              return;
+            }
+            await _updateStatus(
+              context,
+              store,
+              order.id,
+              OrderStatus.recusado,
+              refusalReason: reason,
+            );
           },
-          child: const Text('Recusar pedido'),
         ),
       ];
     }
 
     if (order.status == OrderStatus.novo) {
       return [
-        ElevatedButton(
+        _StatusActionButton(
+          label: 'Colocar em producao',
+          filled: true,
           onPressed: () async {
             await _updateStatus(
               context,
@@ -150,14 +173,22 @@ class OrderDetailScreen extends StatelessWidget {
               OrderStatus.emProducao,
             );
           },
-          child: const Text('Colocar em producao'),
+        ),
+        const SizedBox(height: 10),
+        _StatusActionButton(
+          label: 'Voltar para recebido',
+          onPressed: () async {
+            await _updateStatus(context, store, order.id, OrderStatus.recebido);
+          },
         ),
       ];
     }
 
     if (order.status == OrderStatus.emProducao) {
       return [
-        ElevatedButton(
+        _StatusActionButton(
+          label: 'Terminar pedido',
+          filled: true,
           onPressed: () async {
             await _updateStatus(
               context,
@@ -166,7 +197,40 @@ class OrderDetailScreen extends StatelessWidget {
               OrderStatus.paraEntrega,
             );
           },
-          child: const Text('Terminar pedido'),
+        ),
+        const SizedBox(height: 10),
+        _StatusActionButton(
+          label: 'Voltar para pedido novo',
+          onPressed: () async {
+            await _updateStatus(context, store, order.id, OrderStatus.novo);
+          },
+        ),
+      ];
+    }
+
+    if (order.status == OrderStatus.paraEntrega) {
+      return [
+        _StatusActionButton(
+          label: 'Voltar para producao',
+          onPressed: () async {
+            await _updateStatus(
+              context,
+              store,
+              order.id,
+              OrderStatus.emProducao,
+            );
+          },
+        ),
+      ];
+    }
+
+    if (order.status == OrderStatus.recusado) {
+      return [
+        _StatusActionButton(
+          label: 'Reabrir como recebido',
+          onPressed: () async {
+            await _updateStatus(context, store, order.id, OrderStatus.recebido);
+          },
         ),
       ];
     }
@@ -181,9 +245,14 @@ class OrderDetailScreen extends StatelessWidget {
     OrderStore store,
     String orderId,
     OrderStatus status,
+    {String? refusalReason}
   ) async {
     try {
-      await store.updateStatus(orderId, status);
+      await store.updateStatus(
+        orderId,
+        status,
+        refusalReason: refusalReason,
+      );
 
       if (context.mounted) {
         Navigator.of(context).pop();
@@ -201,6 +270,82 @@ class OrderDetailScreen extends StatelessWidget {
         );
       }
     }
+  }
+
+  Future<String?> _askRefusalReason(BuildContext context) async {
+    final controller = TextEditingController();
+
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Motivo da recusa'),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            maxLines: 4,
+            decoration: const InputDecoration(
+              hintText: 'Explique para o cliente por que o pedido foi recusado',
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final reason = controller.text.trim();
+                if (reason.length < 3) {
+                  return;
+                }
+                Navigator.of(context).pop(reason);
+              },
+              child: const Text('Recusar'),
+            ),
+          ],
+        );
+      },
+    );
+
+    controller.dispose();
+    return result;
+  }
+}
+
+class _StatusActionButton extends StatelessWidget {
+  const _StatusActionButton({
+    required this.label,
+    required this.onPressed,
+    this.filled = false,
+  });
+
+  final String label;
+  final VoidCallback onPressed;
+  final bool filled;
+
+  @override
+  Widget build(BuildContext context) {
+    final child = Text(
+      label,
+      textAlign: TextAlign.center,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+    );
+
+    return SizedBox(
+      width: double.infinity,
+      height: 52,
+      child: filled
+          ? ElevatedButton(
+              onPressed: onPressed,
+              child: child,
+            )
+          : OutlinedButton(
+              onPressed: onPressed,
+              child: child,
+            ),
+    );
   }
 }
 
@@ -259,10 +404,10 @@ class _FinancialCardState extends State<_FinancialCard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text(
+          Text(
             'Financeiro',
             style: TextStyle(
-              color: AppColors.text,
+              color: Theme.of(context).colorScheme.onSurface,
               fontSize: 20,
               fontWeight: FontWeight.w900,
             ),
@@ -385,12 +530,14 @@ class _FinancialMetric extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: danger
             ? AppColors.danger.withValues(alpha: 0.08)
-            : const Color(0xFFEAF3F7),
+            : colors.primary.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(14),
       ),
       child: Column(
@@ -398,8 +545,8 @@ class _FinancialMetric extends StatelessWidget {
         children: [
           Text(
             label,
-            style: const TextStyle(
-              color: AppColors.muted,
+            style: TextStyle(
+              color: colors.onSurfaceVariant,
               fontSize: 12,
               fontWeight: FontWeight.w800,
             ),
@@ -410,7 +557,7 @@ class _FinancialMetric extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              color: danger ? AppColors.danger : AppColors.primaryDark,
+              color: danger ? AppColors.danger : colors.primary,
               fontWeight: FontWeight.w900,
             ),
           ),
@@ -427,6 +574,7 @@ class _ProgressTracker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     final steps = [
       (OrderStatus.recebido, 'Recebido', Icons.inbox_outlined),
       (OrderStatus.novo, 'Aceito', Icons.playlist_add_check),
@@ -480,7 +628,7 @@ class _ProgressTracker extends StatelessWidget {
                 child: Icon(
                   step.$3,
                   size: 18,
-                  color: done ? Colors.white : AppColors.muted,
+                  color: done ? Colors.white : colors.onSurfaceVariant,
                 ),
               ),
               const SizedBox(height: 6),
@@ -490,7 +638,7 @@ class _ProgressTracker extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  color: done ? AppColors.primaryDark : AppColors.muted,
+                  color: done ? colors.primary : colors.onSurfaceVariant,
                   fontSize: 11,
                   fontWeight: FontWeight.w800,
                 ),
@@ -525,16 +673,18 @@ class _StatusBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: AppColors.primary.withValues(alpha: 0.12),
+        color: colors.primary.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
         label,
-        style: const TextStyle(
-          color: AppColors.primaryDark,
+        style: TextStyle(
+          color: colors.primary,
           fontWeight: FontWeight.w800,
           fontSize: 12,
         ),
@@ -554,6 +704,8 @@ class _InfoLine extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
@@ -563,8 +715,8 @@ class _InfoLine extends StatelessWidget {
             width: 120,
             child: Text(
               label,
-              style: const TextStyle(
-                color: AppColors.muted,
+              style: TextStyle(
+                color: colors.onSurfaceVariant,
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -589,17 +741,35 @@ class _ReferenceImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final bytes = imageBytesFromDataUrl(name);
+
+    if (bytes != null) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 8),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(14),
+          child: Image.memory(
+            bytes,
+            height: 220,
+            width: double.infinity,
+            fit: BoxFit.cover,
+          ),
+        ),
+      );
+    }
+
     return Container(
       margin: const EdgeInsets.only(top: 8),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFFEAF3F7),
+        color: colors.primary.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: colors.outlineVariant),
       ),
       child: Row(
         children: [
-          const Icon(Icons.image_outlined, color: AppColors.primary),
+          Icon(Icons.image_outlined, color: colors.primary),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
@@ -607,6 +777,38 @@ class _ReferenceImage extends StatelessWidget {
               style: const TextStyle(fontWeight: FontWeight.w700),
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RefusalReason extends StatelessWidget {
+  const _RefusalReason({required this.reason});
+
+  final String reason;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.danger.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.danger.withValues(alpha: 0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Motivo da recusa',
+            style: TextStyle(
+              color: AppColors.danger,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(reason),
         ],
       ),
     );

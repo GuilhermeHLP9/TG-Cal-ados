@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-
 import '../../../core/services/api_client.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_card.dart';
+import '../../orders/data/order_store.dart';
+import '../../orders/presentation/order_detail_screen.dart';
+import '../../orders/presentation/widgets/order_card.dart';
 import '../data/customer_store.dart';
 
 class CustomersScreen extends StatefulWidget {
@@ -47,16 +48,10 @@ class _CustomersScreenState extends State<CustomersScreen> {
       return customer.name.toLowerCase().contains(search) ||
           (customer.cnpj ?? '').contains(search);
     }).toList();
+    final colors = Theme.of(context).colorScheme;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF0F3F4),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _openCustomerForm(),
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-        icon: const Icon(Icons.person_add_alt_1),
-        label: const Text('Cliente'),
-      ),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: RefreshIndicator(
         onRefresh: widget.store.loadCustomers,
         child: ListView(
@@ -69,10 +64,10 @@ class _CustomersScreenState extends State<CustomersScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         'Clientes',
                         style: TextStyle(
-                          color: AppColors.text,
+                          color: colors.onSurface,
                           fontSize: 28,
                           fontWeight: FontWeight.w900,
                         ),
@@ -80,8 +75,8 @@ class _CustomersScreenState extends State<CustomersScreen> {
                       const SizedBox(height: 4),
                       Text(
                         '${customers.length} exibidos de ${widget.store.customers.length} clientes',
-                        style: const TextStyle(
-                          color: AppColors.muted,
+                        style: TextStyle(
+                          color: colors.onSurfaceVariant,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
@@ -140,12 +135,6 @@ class _CustomersScreenState extends State<CustomersScreen> {
                       textAlign: TextAlign.center,
                       style: const TextStyle(fontWeight: FontWeight.w800),
                     ),
-                    const SizedBox(height: 12),
-                    OutlinedButton.icon(
-                      onPressed: () => _openCustomerForm(),
-                      icon: const Icon(Icons.person_add_alt_1),
-                      label: const Text('Cadastrar cliente'),
-                    ),
                   ],
                 ),
               )
@@ -155,7 +144,10 @@ class _CustomersScreenState extends State<CustomersScreen> {
                   padding: const EdgeInsets.only(bottom: 12),
                   child: _CustomerCard(
                     customer: customer,
-                    onEdit: () => _openCustomerForm(customer: customer),
+                    onOpen: () => _openCustomerOrders(customer),
+                    onApprove: () => _changeStatus(customer, 'APPROVED'),
+                    onReject: () => _changeStatus(customer, 'REJECTED'),
+                    onDelete: () => _confirmDelete(customer),
                   ),
                 ),
               ),
@@ -166,101 +158,347 @@ class _CustomersScreenState extends State<CustomersScreen> {
     );
   }
 
-  Future<void> _openCustomerForm({CustomerItem? customer}) async {
-    final saved = await showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      builder: (context) {
-        return _CustomerFormSheet(
-          store: widget.store,
+  void _openCustomerOrders(CustomerItem customer) {
+    final orderStore = OrderScope.of(context);
+
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => _CustomerOrdersScreen(
           customer: customer,
+          store: orderStore,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _confirmDelete(CustomerItem customer) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Excluir cliente'),
+          content: Text(
+            'Excluir "${customer.name}"? Clientes com pedidos vinculados nao podem ser excluidos.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Excluir'),
+            ),
+          ],
         );
       },
     );
 
-    if (saved == true && mounted) {
+    if (confirmed != true) {
+      return;
+    }
+
+    try {
+      await widget.store.deleteCustomer(customer.id);
+
+      if (!mounted) {
+        return;
+      }
+
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            customer == null
-                ? 'Cliente cadastrado com sucesso.'
-                : 'Cliente atualizado com sucesso.',
-          ),
-        ),
+        const SnackBar(content: Text('Cliente excluido.')),
+      );
+    } on ApiException catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.message)),
+      );
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Nao foi possivel excluir o cliente.')),
       );
     }
+  }
+
+  Future<void> _changeStatus(CustomerItem customer, String status) async {
+    try {
+      await widget.store.updateStatus(customer.id, status);
+
+      if (!mounted) {
+        return;
+      }
+
+      final message =
+          status == 'APPROVED' ? 'Cliente aprovado.' : 'Cliente recusado.';
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    } on ApiException catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.message)),
+      );
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Nao foi possivel atualizar o cliente.')),
+      );
+    }
+  }
+}
+
+class _CustomerOrdersScreen extends StatelessWidget {
+  const _CustomerOrdersScreen({
+    required this.customer,
+    required this.store,
+  });
+
+  final CustomerItem customer;
+  final OrderStore store;
+
+  @override
+  Widget build(BuildContext context) {
+    final orders = store.orders
+        .where((order) => order.customerId == customer.id)
+        .toList(growable: false);
+
+    return Scaffold(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      appBar: AppBar(
+        title: Text(customer.name),
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+      ),
+      body: RefreshIndicator(
+        onRefresh: store.loadOrders,
+        child: ListView(
+          padding: const EdgeInsets.all(20),
+          children: [
+            Text(
+              'Pedidos do cliente',
+              style: Theme.of(context).textTheme.headlineMedium,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '${orders.length} pedidos vinculados',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Telefone: ${_formatPhone(customer.phone) ?? 'Nao informado'}',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 16),
+            if (store.isLoading && store.orders.isEmpty)
+              const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(30),
+                  child: CircularProgressIndicator(),
+                ),
+              )
+            else if (orders.isEmpty)
+              AppCard(
+                child: Column(
+                  children: [
+                    const Icon(
+                      Icons.assignment_outlined,
+                      color: AppColors.primary,
+                      size: 42,
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Nenhum pedido vinculado a este cliente ainda.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                    const SizedBox(height: 12),
+                    OutlinedButton.icon(
+                      onPressed: store.loadOrders,
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Atualizar'),
+                    ),
+                  ],
+                ),
+              )
+            else
+              ...orders.map(
+                (order) => Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: OrderCard(
+                    order: order,
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => OrderDetailScreen(
+                            orderId: order.id,
+                            store: store,
+                            canManage: true,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
 class _CustomerCard extends StatelessWidget {
   const _CustomerCard({
     required this.customer,
-    required this.onEdit,
+    required this.onOpen,
+    required this.onApprove,
+    required this.onReject,
+    required this.onDelete,
   });
 
   final CustomerItem customer;
-  final VoidCallback onEdit;
+  final VoidCallback onOpen;
+  final VoidCallback onApprove;
+  final VoidCallback onReject;
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
     return Material(
-      color: AppColors.surface,
+      color: colors.surface,
       borderRadius: BorderRadius.circular(14),
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
-        onTap: onEdit,
+        onTap: onOpen,
         child: Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: AppColors.border),
+            border: Border.all(color: colors.outlineVariant),
           ),
-          child: Row(
+          child: Column(
             children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.storefront, color: AppColors.primary),
+              Row(
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: colors.primary.withValues(alpha: 0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(Icons.storefront, color: colors.primary),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          customer.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: colors.onSurface,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          _formatCnpj(customer.cnpj) ?? 'CNPJ nao informado',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: colors.onSurfaceVariant,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          _formatPhone(customer.phone) ?? 'Telefone nao informado',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: colors.onSurfaceVariant,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  _CustomerStatusBadge(customer: customer),
+                  PopupMenuButton<String>(
+                    tooltip: 'Acoes do cliente',
+                    onSelected: (value) {
+                      if (value == 'delete') {
+                        onDelete();
+                      }
+                    },
+                    itemBuilder: (context) => const [
+                      PopupMenuItem(
+                        value: 'delete',
+                        child: Row(
+                          children: [
+                            Icon(Icons.delete_outline, color: AppColors.danger),
+                            SizedBox(width: 10),
+                            Text('Excluir'),
+                          ],
+                        ),
+                      ),
+                    ],
+                    icon: const Icon(Icons.more_vert),
+                  ),
+                ],
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+              if (customer.isPending) ...[
+                const SizedBox(height: 14),
+                Row(
                   children: [
-                    Text(
-                      customer.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: AppColors.text,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w900,
+                    Expanded(
+                      child: SizedBox(
+                        height: 46,
+                        child: FilledButton.icon(
+                          onPressed: onApprove,
+                          icon: const Icon(Icons.check_circle_outline),
+                          label: const Text('Aceitar'),
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 3),
-                    Text(
-                      _formatCnpj(customer.cnpj) ?? 'CNPJ nao informado',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: AppColors.muted,
-                        fontWeight: FontWeight.w700,
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: SizedBox(
+                        height: 46,
+                        child: OutlinedButton.icon(
+                          onPressed: onReject,
+                          icon: const Icon(Icons.block),
+                          label: const Text('Recusar'),
+                        ),
                       ),
                     ),
                   ],
                 ),
-              ),
-              const SizedBox(width: 8),
-              IconButton(
-                tooltip: 'Editar cliente',
-                onPressed: onEdit,
-                icon: const Icon(Icons.edit_outlined),
-              ),
+              ],
             ],
           ),
         ),
@@ -269,179 +507,35 @@ class _CustomerCard extends StatelessWidget {
   }
 }
 
-class _CustomerFormSheet extends StatefulWidget {
-  const _CustomerFormSheet({
-    required this.store,
-    this.customer,
-  });
+class _CustomerStatusBadge extends StatelessWidget {
+  const _CustomerStatusBadge({required this.customer});
 
-  final CustomerStore store;
-  final CustomerItem? customer;
-
-  @override
-  State<_CustomerFormSheet> createState() => _CustomerFormSheetState();
-}
-
-class _CustomerFormSheetState extends State<_CustomerFormSheet> {
-  final _formKey = GlobalKey<FormState>();
-  late final TextEditingController _nameController;
-  late final TextEditingController _cnpjController;
-  bool _isSaving = false;
-  String? _error;
-
-  @override
-  void initState() {
-    super.initState();
-    _nameController = TextEditingController(text: widget.customer?.name ?? '');
-    _cnpjController = TextEditingController(text: widget.customer?.cnpj ?? '');
-  }
-
-  @override
-  void dispose() {
-    _nameController.dispose();
-    _cnpjController.dispose();
-    super.dispose();
-  }
+  final CustomerItem customer;
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      top: false,
-      child: Padding(
-        padding: EdgeInsets.fromLTRB(
-          20,
-          8,
-          20,
-          MediaQuery.of(context).viewInsets.bottom + 20,
-        ),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                widget.customer == null ? 'Cadastrar cliente' : 'Editar cliente',
-                style: const TextStyle(
-                  color: AppColors.text,
-                  fontSize: 24,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _nameController,
-                validator: _required,
-                decoration: const InputDecoration(
-                  labelText: 'Nome do cliente',
-                  hintText: 'Ex.: Calcados Franca Norte',
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _cnpjController,
-                keyboardType: TextInputType.number,
-                inputFormatters: const [_CnpjInputFormatter()],
-                validator: _optionalCnpj,
-                decoration: const InputDecoration(
-                  labelText: 'CNPJ',
-                  hintText: '00.000.000/0000-00',
-                ),
-              ),
-              if (_error != null) ...[
-                const SizedBox(height: 12),
-                Text(
-                  _error!,
-                  style: const TextStyle(
-                    color: AppColors.danger,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed:
-                          _isSaving ? null : () => Navigator.of(context).pop(),
-                      child: const Text('Cancelar'),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: _isSaving ? null : _save,
-                      child: Text(_isSaving ? 'Salvando...' : 'Salvar'),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
+    final colors = Theme.of(context).colorScheme;
+    final color = customer.isApproved
+        ? colors.primary
+        : customer.isPending
+            ? const Color(0xFFE2A800)
+            : AppColors.danger;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        customer.statusLabel,
+        style: TextStyle(
+          color: color,
+          fontSize: 12,
+          fontWeight: FontWeight.w900,
         ),
       ),
     );
-  }
-
-  Future<void> _save() async {
-    if (!(_formKey.currentState?.validate() ?? false)) {
-      return;
-    }
-
-    setState(() {
-      _isSaving = true;
-      _error = null;
-    });
-
-    try {
-      final customer = widget.customer;
-
-      if (customer == null) {
-        await widget.store.createCustomer(
-          name: _nameController.text.trim(),
-          cnpj: _cnpjController.text.trim(),
-        );
-      } else {
-        await widget.store.updateCustomer(
-          id: customer.id,
-          name: _nameController.text.trim(),
-          cnpj: _cnpjController.text.trim(),
-        );
-      }
-
-      if (mounted) {
-        Navigator.of(context).pop(true);
-      }
-    } on ApiException catch (error) {
-      setState(() {
-        _error = error.message;
-        _isSaving = false;
-      });
-    } catch (_) {
-      setState(() {
-        _error = 'Nao foi possivel salvar o cliente.';
-        _isSaving = false;
-      });
-    }
-  }
-
-  String? _required(String? value) {
-    if (value == null || value.trim().isEmpty) {
-      return 'Campo obrigatorio.';
-    }
-
-    return null;
-  }
-
-  String? _optionalCnpj(String? value) {
-    final digits = (value ?? '').replaceAll(RegExp(r'[^0-9]'), '');
-
-    if (digits.isEmpty || digits.length == 14) {
-      return null;
-    }
-
-    return 'Informe 14 numeros para o CNPJ.';
   }
 }
 
@@ -478,40 +572,6 @@ class _InlineError extends StatelessWidget {
   }
 }
 
-class _CnpjInputFormatter extends TextInputFormatter {
-  const _CnpjInputFormatter();
-
-  @override
-  TextEditingValue formatEditUpdate(
-    TextEditingValue oldValue,
-    TextEditingValue newValue,
-  ) {
-    final digits = newValue.text.replaceAll(RegExp(r'[^0-9]'), '');
-    final limited = digits.length > 14 ? digits.substring(0, 14) : digits;
-    final buffer = StringBuffer();
-
-    for (var i = 0; i < limited.length; i++) {
-      if (i == 2 || i == 5) {
-        buffer.write('.');
-      }
-      if (i == 8) {
-        buffer.write('/');
-      }
-      if (i == 12) {
-        buffer.write('-');
-      }
-      buffer.write(limited[i]);
-    }
-
-    final text = buffer.toString();
-
-    return TextEditingValue(
-      text: text,
-      selection: TextSelection.collapsed(offset: text.length),
-    );
-  }
-}
-
 String? _formatCnpj(String? value) {
   if (value == null || value.isEmpty) {
     return null;
@@ -524,4 +584,20 @@ String? _formatCnpj(String? value) {
   }
 
   return '${digits.substring(0, 2)}.${digits.substring(2, 5)}.${digits.substring(5, 8)}/${digits.substring(8, 12)}-${digits.substring(12, 14)}';
+}
+
+String? _formatPhone(String? value) {
+  if (value == null || value.isEmpty) {
+    return null;
+  }
+
+  final digits = value.replaceAll(RegExp(r'[^0-9]'), '');
+  if (digits.length == 10) {
+    return '(${digits.substring(0, 2)}) ${digits.substring(2, 6)}-${digits.substring(6, 10)}';
+  }
+  if (digits.length == 11) {
+    return '(${digits.substring(0, 2)}) ${digits.substring(2, 7)}-${digits.substring(7, 11)}';
+  }
+
+  return value;
 }

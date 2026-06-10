@@ -3,6 +3,7 @@ enum OrderStatus { recebido, novo, emProducao, paraEntrega, recusado }
 class Order {
   const Order({
     required this.id,
+    required this.number,
     this.customerId,
     required this.clientName,
     required this.productName,
@@ -16,10 +17,12 @@ class Order {
     this.apiTotalPrice,
     this.profit,
     this.referencePhoto,
+    this.refusalReason,
     this.notes,
   });
 
   final String id;
+  final int number;
   final String? customerId;
   final String clientName;
   final String productName;
@@ -33,14 +36,17 @@ class Order {
   final double? apiTotalPrice;
   final double? profit;
   final String? referencePhoto;
+  final String? refusalReason;
   final String? notes;
 
   double get totalPrice => apiTotalPrice ?? quantity * pricePerPair;
+  String get displayCode => '#$number';
   double get estimatedProfit => profit ?? totalPrice - (materialCost ?? 0);
   double get profitMargin => totalPrice <= 0 ? 0 : estimatedProfit / totalPrice;
 
   Order copyWith({
     String? id,
+    int? number,
     String? customerId,
     String? clientName,
     String? productName,
@@ -54,10 +60,12 @@ class Order {
     double? apiTotalPrice,
     double? profit,
     String? referencePhoto,
+    String? refusalReason,
     String? notes,
   }) {
     return Order(
       id: id ?? this.id,
+      number: number ?? this.number,
       customerId: customerId ?? this.customerId,
       clientName: clientName ?? this.clientName,
       productName: productName ?? this.productName,
@@ -71,6 +79,7 @@ class Order {
       apiTotalPrice: apiTotalPrice ?? this.apiTotalPrice,
       profit: profit ?? this.profit,
       referencePhoto: referencePhoto ?? this.referencePhoto,
+      refusalReason: refusalReason ?? this.refusalReason,
       notes: notes ?? this.notes,
     );
   }

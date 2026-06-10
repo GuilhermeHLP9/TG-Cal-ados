@@ -34,6 +34,8 @@ C:\flutter\bin\flutter.bat devices
 
 ```powershell
 cd C:\Users\guilh\Desktop\ADS\TG\sistema-gestao-calcados
+npx.cmd prisma migrate deploy --schema apps/api/prisma/schema.prisma
+npm.cmd run seed --workspace api
 npm.cmd run api
 ```
 
@@ -55,7 +57,8 @@ lib/
 
 ## MVP atual no Flutter
 
-- login com entrada demo para cliente e proprietario
+- login real pela API para cliente e proprietario
+- cadastro cria apenas usuario cliente vinculado ao proprietario
 - area do cliente com pedidos e criacao de pedido
-- area do proprietario com dashboard e lista de pedidos
-- dados mockados prontos para trocar por integracao real
+- area do proprietario com notas, clientes, pedidos, financeiro e configuracoes
+- dados carregados e atualizados pelo backend local

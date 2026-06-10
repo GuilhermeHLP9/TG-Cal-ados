@@ -100,11 +100,15 @@ class OrderStore extends ChangeNotifier {
     }
 
     final nextId = 'PED-${(_orders.length + 1).toString().padLeft(3, '0')}';
+    final nextNumber = _orders.isEmpty
+        ? 1
+        : _orders.map((order) => order.number).reduce((a, b) => a > b ? a : b) + 1;
 
     _orders.insert(
       0,
       Order(
         id: nextId,
+        number: nextNumber,
         customerId: customerId,
         clientName: 'Cliente',
         productName: productName,
@@ -122,7 +126,11 @@ class OrderStore extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> updateStatus(String orderId, OrderStatus status) async {
+  Future<void> updateStatus(
+    String orderId,
+    OrderStatus status, {
+    String? refusalReason,
+  }) async {
     final apiClient = _apiClient;
     final token = _token;
     final index = _orders.indexWhere((order) => order.id == orderId);
@@ -136,9 +144,13 @@ class OrderStore extends ChangeNotifier {
         token: token,
         orderId: orderId,
         status: status,
+        refusalReason: refusalReason,
       );
     } else {
-      _orders[index] = _orders[index].copyWith(status: status);
+      _orders[index] = _orders[index].copyWith(
+        status: status,
+        refusalReason: status == OrderStatus.recusado ? refusalReason : '',
+      );
     }
 
     notifyListeners();

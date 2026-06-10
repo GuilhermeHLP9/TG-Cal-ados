@@ -16,6 +16,8 @@ class OrderCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
     return InkWell(
       borderRadius: BorderRadius.circular(8),
       onTap: onTap,
@@ -27,7 +29,7 @@ class OrderCard extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  order.id,
+                  'Pedido ${order.displayCode}',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         fontWeight: FontWeight.w700,
                       ),
@@ -35,7 +37,7 @@ class OrderCard extends StatelessWidget {
                 Text(
                   order.statusLabel,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: AppColors.primaryDark,
+                        color: colors.primary,
                         fontWeight: FontWeight.w700,
                       ),
                 ),
@@ -54,7 +56,20 @@ class OrderCard extends StatelessWidget {
                 order.notes!,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: AppColors.muted),
+                style: TextStyle(color: colors.onSurfaceVariant),
+              ),
+            ],
+            if (order.refusalReason != null &&
+                order.refusalReason!.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(
+                'Motivo da recusa: ${order.refusalReason!}',
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: AppColors.danger,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ],
             if (onTap != null) ...[

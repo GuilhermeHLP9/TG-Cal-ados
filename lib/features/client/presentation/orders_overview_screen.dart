@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/models/order.dart';
+import '../../../core/services/api_client.dart';
 import '../../../core/theme/app_theme.dart';
 import 'create_order_screen.dart';
 import '../../orders/data/order_store.dart';
@@ -15,7 +16,12 @@ enum _ClientOrderFilter {
 }
 
 class OrdersOverviewScreen extends StatefulWidget {
-  const OrdersOverviewScreen({super.key});
+  const OrdersOverviewScreen({
+    super.key,
+    required this.user,
+  });
+
+  final AuthUser user;
 
   @override
   State<OrdersOverviewScreen> createState() => _OrdersOverviewScreenState();
@@ -56,14 +62,13 @@ class _OrdersOverviewScreenState extends State<OrdersOverviewScreen> {
           _ClientOrdersHeader(
             totalOrders: orders.length,
             visibleOrders: visibleOrders.length,
-            onCreate: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => CreateOrderScreen(store: store),
-                ),
-              );
-            },
+            canCreate: widget.user.canCreateOrders,
+            onCreate: () => _openCreateOrder(store),
           ),
+          if (!widget.user.canCreateOrders) ...[
+            const SizedBox(height: 12),
+            _ApprovalPendingNotice(status: widget.user.customer?.status),
+          ],
           if (store.error != null) ...[
             const SizedBox(height: 12),
             _InlineError(message: store.error!),
@@ -120,6 +125,23 @@ class _OrdersOverviewScreenState extends State<OrdersOverviewScreen> {
     });
   }
 
+  void _openCreateOrder(OrderStore store) {
+    if (!widget.user.canCreateOrders) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Aguarde o proprietario aceitar seu cadastro.'),
+        ),
+      );
+      return;
+    }
+
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => CreateOrderScreen(store: store),
+      ),
+    );
+  }
+
   List<Order> _filterOrders(List<Order> orders) {
     final search = _searchController.text.trim().toLowerCase();
 
@@ -152,15 +174,19 @@ class _ClientOrdersHeader extends StatelessWidget {
   const _ClientOrdersHeader({
     required this.totalOrders,
     required this.visibleOrders,
+    required this.canCreate,
     required this.onCreate,
   });
 
   final int totalOrders;
   final int visibleOrders;
+  final bool canCreate;
   final VoidCallback onCreate;
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -168,10 +194,10 @@ class _ClientOrdersHeader extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 'Meus pedidos',
                 style: TextStyle(
-                  color: AppColors.text,
+                  color: colors.onSurface,
                   fontSize: 28,
                   fontWeight: FontWeight.w900,
                 ),
@@ -179,8 +205,8 @@ class _ClientOrdersHeader extends StatelessWidget {
               const SizedBox(height: 4),
               Text(
                 '$visibleOrders exibidos de $totalOrders pedidos',
-                style: const TextStyle(
-                  color: AppColors.muted,
+                style: TextStyle(
+                  color: colors.onSurfaceVariant,
                   fontWeight: FontWeight.w700,
                 ),
               ),
@@ -189,7 +215,7 @@ class _ClientOrdersHeader extends StatelessWidget {
         ),
         IconButton.filled(
           tooltip: 'Criar pedido',
-          onPressed: onCreate,
+          onPressed: canCreate ? onCreate : null,
           style: IconButton.styleFrom(
             backgroundColor: AppColors.primary,
             foregroundColor: Colors.white,
@@ -214,6 +240,7 @@ class _FilterStrip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     final items = [
       (_ClientOrderFilter.all, 'Todos', orders.length),
       (_ClientOrderFilter.open, 'Abertos', _countOpen()),
@@ -236,15 +263,15 @@ class _FilterStrip extends StatelessWidget {
             selected: isSelected,
             label: Text('${item.$2} (${item.$3})'),
             onSelected: (_) => onSelected(item.$1),
-            selectedColor: AppColors.primary,
+            selectedColor: colors.primary,
             labelStyle: TextStyle(
-              color: isSelected ? Colors.white : AppColors.primaryDark,
+              color: isSelected ? colors.onPrimary : colors.primary,
               fontWeight: FontWeight.w800,
             ),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(999),
               side: BorderSide(
-                color: isSelected ? AppColors.primary : AppColors.border,
+                color: isSelected ? colors.primary : colors.outlineVariant,
               ),
             ),
           );
@@ -268,6 +295,52 @@ class _FilterStrip extends StatelessWidget {
   }
 }
 
+class _ApprovalPendingNotice extends StatelessWidget {
+  const _ApprovalPendingNotice({required this.status});
+
+  final String? status;
+
+  @override
+  Widget build(BuildContext context) {
+    final rejected = status == 'REJECTED';
+    final colors = Theme.of(context).colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: (rejected ? AppColors.danger : colors.primary)
+            .withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: (rejected ? AppColors.danger : colors.primary)
+              .withValues(alpha: 0.24),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            rejected ? Icons.block : Icons.hourglass_top_outlined,
+            color: rejected ? AppColors.danger : colors.primary,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              rejected
+                  ? 'Seu cadastro foi recusado pelo proprietario.'
+                  : 'Seu cadastro ainda precisa ser aceito pelo proprietario para criar pedidos.',
+              style: TextStyle(
+                color: colors.onSurface,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _ClientOrderCard extends StatelessWidget {
   const _ClientOrderCard({
     required this.order,
@@ -279,8 +352,10 @@ class _ClientOrderCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
     return Material(
-      color: AppColors.surface,
+      color: colors.surface,
       borderRadius: BorderRadius.circular(14),
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
@@ -289,7 +364,7 @@ class _ClientOrderCard extends StatelessWidget {
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: AppColors.border),
+            border: Border.all(color: colors.outlineVariant),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -302,8 +377,8 @@ class _ClientOrderCard extends StatelessWidget {
                       order.productName,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: AppColors.text,
+                      style: TextStyle(
+                        color: colors.onSurface,
                         fontSize: 19,
                         fontWeight: FontWeight.w900,
                       ),
@@ -320,6 +395,10 @@ class _ClientOrderCard extends StatelessWidget {
                 spacing: 10,
                 runSpacing: 10,
                 children: [
+                  _InfoPill(
+                    icon: Icons.confirmation_number_outlined,
+                    label: order.displayCode,
+                  ),
                   _InfoPill(icon: Icons.inventory_2_outlined, label: '${order.quantity} pares'),
                   _InfoPill(icon: Icons.event_outlined, label: order.dueDate),
                   _InfoPill(
@@ -328,6 +407,19 @@ class _ClientOrderCard extends StatelessWidget {
                   ),
                 ],
               ),
+              if (order.refusalReason != null &&
+                  order.refusalReason!.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                Text(
+                  'Motivo da recusa: ${order.refusalReason!}',
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: AppColors.danger,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
               const SizedBox(height: 10),
               Row(
                 children: const [
@@ -389,21 +481,23 @@ class _InfoPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
       decoration: BoxDecoration(
-        color: const Color(0xFFEAF3F7),
+        color: colors.primary.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(999),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, color: AppColors.primary, size: 16),
+          Icon(icon, color: colors.primary, size: 16),
           const SizedBox(width: 6),
           Text(
             label,
-            style: const TextStyle(
-              color: AppColors.primaryDark,
+            style: TextStyle(
+              color: colors.primary,
               fontSize: 12,
               fontWeight: FontWeight.w800,
             ),
@@ -452,12 +546,14 @@ class _EmptyOrders extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
     return Container(
       padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: colors.surface,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: colors.outlineVariant),
       ),
       child: Column(
         children: [

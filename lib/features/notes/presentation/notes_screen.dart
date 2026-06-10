@@ -48,7 +48,7 @@ class _NotesScreenState extends State<NotesScreen> {
         final notes = _visibleNotes(widget.store.notes);
 
         return Scaffold(
-          backgroundColor: AppColors.background,
+          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
           body: SafeArea(
             child: Stack(
               children: [
@@ -103,13 +103,15 @@ class _NotesScreenState extends State<NotesScreen> {
                           ),
                         ),
                       if (notes.isEmpty)
-                        const SliverFillRemaining(
+                        SliverFillRemaining(
                           hasScrollBody: false,
                           child: Center(
                             child: Text(
                               'Nenhuma nota',
                               style: TextStyle(
-                                color: AppColors.muted,
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurfaceVariant,
                                 fontSize: 22,
                                 fontWeight: FontWeight.w700,
                               ),
@@ -182,8 +184,8 @@ class _NotesScreenState extends State<NotesScreen> {
                     padding: const EdgeInsets.only(bottom: 16),
                     child: Text(
                       section.title,
-                      style: const TextStyle(
-                        color: AppColors.text,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurface,
                         fontSize: 20,
                         fontWeight: FontWeight.w800,
                       ),
@@ -427,19 +429,21 @@ class _Header extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
     if (selecting) {
       return Row(
         children: [
           IconButton(
             tooltip: 'Cancelar selecao',
             onPressed: onCancelSelection,
-            icon: const Icon(Icons.close, color: AppColors.text),
+            icon: Icon(Icons.close, color: colors.onSurface),
           ),
           const SizedBox(width: 10),
           Text(
             '$selectedCount selecionada${selectedCount == 1 ? '' : 's'}',
-            style: const TextStyle(
-              color: AppColors.text,
+            style: TextStyle(
+              color: colors.onSurface,
               fontSize: 26,
               fontWeight: FontWeight.w800,
             ),
@@ -450,11 +454,11 @@ class _Header extends StatelessWidget {
 
     return Column(
       children: [
-        const Text(
+        Text(
           'Todas as notas',
           textAlign: TextAlign.center,
           style: TextStyle(
-            color: AppColors.text,
+            color: colors.onSurface,
             fontSize: 38,
             fontWeight: FontWeight.w900,
           ),
@@ -462,8 +466,8 @@ class _Header extends StatelessWidget {
         const SizedBox(height: 10),
         Text(
           '$count nota${count == 1 ? '' : 's'}',
-          style: const TextStyle(
-            color: AppColors.muted,
+          style: TextStyle(
+            color: colors.onSurfaceVariant,
             fontSize: 20,
             fontWeight: FontWeight.w800,
           ),
@@ -490,17 +494,19 @@ class _Toolbar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
     return Row(
       children: [
         const Spacer(),
         IconButton(
           tooltip: 'Filtros',
           onPressed: onFilter,
-          icon: const Icon(Icons.tune, color: AppColors.primary, size: 34),
+          icon: Icon(Icons.tune, color: colors.primary, size: 34),
         ),
         PopupMenuButton<String>(
           tooltip: 'Mais opcoes',
-          color: AppColors.surface,
+          color: colors.surface,
           offset: const Offset(0, 48),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(26),
@@ -528,9 +534,9 @@ class _Toolbar extends StatelessWidget {
               ),
             ),
           ],
-          child: const Padding(
-            padding: EdgeInsets.all(10),
-            child: Icon(Icons.more_vert, color: AppColors.primary, size: 34),
+          child: Padding(
+            padding: const EdgeInsets.all(10),
+            child: Icon(Icons.more_vert, color: colors.primary, size: 34),
           ),
         ),
       ],
@@ -547,7 +553,10 @@ class _MenuText extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       text,
-      style: const TextStyle(color: AppColors.text, fontSize: 20),
+      style: TextStyle(
+        color: Theme.of(context).colorScheme.onSurface,
+        fontSize: 20,
+      ),
     );
   }
 }
@@ -590,6 +599,7 @@ class _SelectionActionBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hasSelection = selectedCount > 0;
+    final colors = Theme.of(context).colorScheme;
 
     return Positioned(
       left: 16,
@@ -600,9 +610,9 @@ class _SelectionActionBar extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
-            color: AppColors.surface,
+            color: colors.surface,
             borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: AppColors.border),
+            border: Border.all(color: colors.outlineVariant),
             boxShadow: const [
               BoxShadow(
                 color: Color(0x22000000),
@@ -659,7 +669,8 @@ class _SelectionActionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final effectiveColor = enabled ? color : AppColors.muted;
+    final effectiveColor =
+        enabled ? color : Theme.of(context).colorScheme.onSurfaceVariant;
 
     return Expanded(
       child: InkWell(
@@ -707,6 +718,8 @@ class _NoteTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
     return GestureDetector(
       onTap: onTap,
       onLongPress: onLongPress,
@@ -727,11 +740,11 @@ class _NoteTile extends StatelessWidget {
                         16,
                       ),
                       decoration: BoxDecoration(
-                        color: AppColors.surface,
+                        color: colors.surface,
                         borderRadius: BorderRadius.circular(18),
                         border: selected
-                            ? Border.all(color: AppColors.primary, width: 2)
-                            : Border.all(color: AppColors.border),
+                            ? Border.all(color: colors.primary, width: 2)
+                            : Border.all(color: colors.outlineVariant),
                         boxShadow: const [
                           BoxShadow(
                             color: Color(0x14000000),
@@ -744,8 +757,8 @@ class _NoteTile extends StatelessWidget {
                         _previewText(note),
                         maxLines: 8,
                         overflow: TextOverflow.fade,
-                        style: const TextStyle(
-                          color: AppColors.text,
+                        style: TextStyle(
+                          color: colors.onSurface,
                           fontSize: 16,
                           height: 1.35,
                         ),
@@ -774,8 +787,8 @@ class _NoteTile extends StatelessWidget {
             textAlign: TextAlign.center,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: AppColors.text,
+            style: TextStyle(
+              color: colors.onSurface,
               fontSize: 19,
               fontWeight: FontWeight.w900,
             ),
@@ -784,8 +797,8 @@ class _NoteTile extends StatelessWidget {
           Text(
             _formatNoteDate(note.createdAt),
             textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: AppColors.muted,
+            style: TextStyle(
+              color: colors.onSurfaceVariant,
               fontSize: 16,
               fontWeight: FontWeight.w700,
             ),
@@ -803,14 +816,16 @@ class _SelectionBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
     return Container(
       width: 26,
       height: 26,
       decoration: BoxDecoration(
-        color: selected ? AppColors.primary : const Color(0x1F5D6775),
+        color: selected ? colors.primary : colors.onSurface.withValues(alpha: 0.08),
         shape: BoxShape.circle,
         border: Border.all(
-          color: selected ? AppColors.primary : AppColors.muted,
+          color: selected ? colors.primary : colors.onSurfaceVariant,
           width: 2,
         ),
       ),
@@ -856,11 +871,13 @@ class _NoteEditorScreenState extends State<_NoteEditorScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: AppColors.background,
-        foregroundColor: AppColors.text,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        foregroundColor: colors.onSurface,
         elevation: 0,
         actions: [
           IconButton(
@@ -881,14 +898,14 @@ class _NoteEditorScreenState extends State<_NoteEditorScreen> {
             children: [
               TextField(
                 controller: _titleController,
-                style: const TextStyle(
-                  color: AppColors.text,
+                style: TextStyle(
+                  color: colors.onSurface,
                   fontSize: 28,
                   fontWeight: FontWeight.w900,
                 ),
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   hintText: 'Sem titulo',
-                  hintStyle: TextStyle(color: Color(0xFF77777D)),
+                  hintStyle: TextStyle(color: colors.onSurfaceVariant),
                   border: InputBorder.none,
                 ),
               ),
@@ -900,14 +917,14 @@ class _NoteEditorScreenState extends State<_NoteEditorScreen> {
                   maxLines: null,
                   minLines: null,
                   textAlignVertical: TextAlignVertical.top,
-                  style: const TextStyle(
-                    color: AppColors.text,
+                  style: TextStyle(
+                    color: colors.onSurface,
                     fontSize: 18,
                     height: 1.45,
                   ),
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     hintText: 'Escreva aqui...',
-                    hintStyle: TextStyle(color: Color(0xFF77777D)),
+                    hintStyle: TextStyle(color: colors.onSurfaceVariant),
                     border: InputBorder.none,
                   ),
                 ),
@@ -952,6 +969,7 @@ class _SortSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     final items = [
       (_NoteSort.createdAsc, 'Data de criacao (crescente)'),
       (_NoteSort.createdDesc, 'Data de criacao (decrescente)'),
@@ -964,10 +982,10 @@ class _SortSheet extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text(
+          Text(
             'Ordenar por',
             style: TextStyle(
-              color: AppColors.text,
+              color: colors.onSurface,
               fontSize: 24,
               fontWeight: FontWeight.w900,
             ),
@@ -981,12 +999,11 @@ class _SortSheet extends StatelessWidget {
                 isSelected
                     ? Icons.radio_button_checked
                     : Icons.radio_button_unchecked,
-                color:
-                    isSelected ? AppColors.primary : AppColors.muted,
+                color: isSelected ? colors.primary : colors.onSurfaceVariant,
               ),
               title: Text(
                 item.$2,
-                style: const TextStyle(color: AppColors.text, fontSize: 20),
+                style: TextStyle(color: colors.onSurface, fontSize: 20),
               ),
               onTap: () => Navigator.of(context).pop(item.$1),
             );
@@ -1034,6 +1051,8 @@ class _FilterSheetState extends State<_FilterSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
     return _BottomPanel(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -1041,10 +1060,10 @@ class _FilterSheetState extends State<_FilterSheet> {
         children: [
           Row(
             children: [
-              const Text(
+              Text(
                 'Filtros',
                 style: TextStyle(
-                  color: AppColors.text,
+                  color: colors.onSurface,
                   fontSize: 24,
                   fontWeight: FontWeight.w900,
                 ),
@@ -1055,7 +1074,7 @@ class _FilterSheetState extends State<_FilterSheet> {
                 onPressed: () => Navigator.of(context).pop(
                   _FilterResult(_timeFilter, _favoritesOnly),
                 ),
-                icon: const Icon(Icons.check, color: AppColors.primary),
+                icon: Icon(Icons.check, color: colors.primary),
               ),
             ],
           ),
@@ -1110,6 +1129,7 @@ class _BottomPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final maxHeight = MediaQuery.sizeOf(context).height * 0.72;
+    final colors = Theme.of(context).colorScheme;
 
     return Padding(
       padding: const EdgeInsets.all(18),
@@ -1118,9 +1138,9 @@ class _BottomPanel extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
-            color: AppColors.surface,
+            color: colors.surface,
             borderRadius: BorderRadius.circular(28),
-            border: Border.all(color: AppColors.border),
+            border: Border.all(color: colors.outlineVariant),
           ),
           child: SafeArea(
             top: false,
@@ -1139,10 +1159,12 @@ class _FilterLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
     return Text(
       text,
-      style: const TextStyle(
-        color: AppColors.muted,
+      style: TextStyle(
+        color: colors.onSurfaceVariant,
         fontSize: 18,
         fontWeight: FontWeight.w900,
       ),
@@ -1163,6 +1185,8 @@ class _FilterChipButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
     return InkWell(
       borderRadius: BorderRadius.circular(999),
       onTap: onTap,
@@ -1170,16 +1194,16 @@ class _FilterChipButton extends StatelessWidget {
         constraints: const BoxConstraints(minHeight: 42),
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
         decoration: BoxDecoration(
-          color: selected ? AppColors.primary : Colors.transparent,
+          color: selected ? colors.primary : Colors.transparent,
           borderRadius: BorderRadius.circular(999),
           border: Border.all(
-            color: selected ? AppColors.primary : AppColors.border,
+            color: selected ? colors.primary : colors.outlineVariant,
           ),
         ),
         child: Text(
           label,
           style: TextStyle(
-            color: selected ? Colors.white : AppColors.primaryDark,
+            color: selected ? colors.onPrimary : colors.primary,
             fontWeight: FontWeight.w800,
           ),
         ),

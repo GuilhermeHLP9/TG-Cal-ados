@@ -17,6 +17,13 @@ class ApiClient {
   final http.Client _httpClient;
   final String _baseUrl;
 
+  String get baseUrl => _baseUrl;
+
+  Future<bool> checkHealth() async {
+    final response = await _get('/health') as Map<String, dynamic>;
+    return response['status'] == 'ok';
+  }
+
   Future<AuthSession> login({
     required String email,
     required String password,
@@ -35,6 +42,7 @@ class ApiClient {
   Future<AuthSession> register({
     required String name,
     required String email,
+    required String phone,
     required String password,
     required String companyName,
     required String companyCnpj,
@@ -45,6 +53,7 @@ class ApiClient {
       body: {
         'name': name,
         'email': email,
+        'phone': phone,
         'password': password,
         'companyName': companyName,
         'companyCnpj': companyCnpj,
@@ -63,6 +72,26 @@ class ApiClient {
     return json['available'] == true;
   }
 
+  Future<void> requestPasswordReset(String email) async {
+    await _post(
+      '/auth/forgot-password',
+      body: {'email': email.trim().toLowerCase()},
+    );
+  }
+
+  Future<void> resetPassword({
+    required String token,
+    required String password,
+  }) async {
+    await _post(
+      '/auth/reset-password',
+      body: {
+        'token': token.trim(),
+        'password': password,
+      },
+    );
+  }
+
   Future<AuthUser> getMe(String token) async {
     final response = await _get('/me', token: token);
     return AuthUser.fromJson(response as Map<String, dynamic>);
@@ -71,6 +100,9 @@ class ApiClient {
   Future<AuthUser> updateMe({
     required String token,
     String? name,
+    String? email,
+    String? phone,
+    String? profileImage,
     String? currentPassword,
     String? newPassword,
     String? companyName,
@@ -81,6 +113,10 @@ class ApiClient {
       token: token,
       body: {
         if (name != null && name.trim().isNotEmpty) 'name': name.trim(),
+        if (email != null && email.trim().isNotEmpty)
+          'email': email.trim().toLowerCase(),
+        if (phone != null && phone.trim().isNotEmpty) 'phone': phone.trim(),
+        ...?profileImage == null ? null : {'profileImage': profileImage},
         if (currentPassword != null && currentPassword.isNotEmpty)
           'currentPassword': currentPassword,
         if (newPassword != null && newPassword.isNotEmpty)
@@ -148,6 +184,7 @@ class ApiClient {
     required String token,
     required String name,
     String? cnpj,
+    String? phone,
   }) async {
     final response = await _post(
       '/customers',
@@ -155,27 +192,35 @@ class ApiClient {
       body: {
         'name': name,
         if (cnpj != null && cnpj.trim().isNotEmpty) 'cnpj': cnpj,
+        if (phone != null && phone.trim().isNotEmpty) 'phone': phone,
       },
     );
 
     return CustomerItem.fromJson(response as Map<String, dynamic>);
   }
 
-  Future<CustomerItem> updateCustomer({
+  Future<int> deleteCustomer({
     required String token,
     required String id,
-    String? name,
-    String? cnpj,
   }) async {
-    final response = await _patch(
+    final response = await _delete(
       '/customers/$id',
       token: token,
-      body: {
-        ...?name != null && name.trim().isNotEmpty
-            ? {'name': name.trim()}
-            : null,
-        ...?cnpj != null ? {'cnpj': cnpj} : null,
-      },
+      body: {},
+    );
+    final json = response as Map<String, dynamic>;
+    return json['deleted'] as int;
+  }
+
+  Future<CustomerItem> updateCustomerStatus({
+    required String token,
+    required String id,
+    required String status,
+  }) async {
+    final response = await _patch(
+      '/customers/$id/status',
+      token: token,
+      body: {'status': status},
     );
 
     return CustomerItem.fromJson(response as Map<String, dynamic>);
@@ -185,11 +230,16 @@ class ApiClient {
     required String token,
     required String orderId,
     required OrderStatus status,
+    String? refusalReason,
   }) async {
     final response = await _patch(
       '/orders/$orderId/status',
       token: token,
-      body: {'status': status.toApiValue()},
+      body: {
+        'status': status.toApiValue(),
+        if (refusalReason != null && refusalReason.trim().isNotEmpty)
+          'refusalReason': refusalReason.trim(),
+      },
     );
 
     return OrderDto.fromJson(response as Map<String, dynamic>).toOrder();
@@ -358,18 +408,41 @@ class CustomerItem {
   const CustomerItem({
     required this.id,
     required this.name,
+    required this.status,
     this.cnpj,
+    this.phone,
   });
 
   final String id;
   final String name;
+  final String status;
   final String? cnpj;
+  final String? phone;
+
+  bool get isPending => status == 'PENDING';
+  bool get isApproved => status == 'APPROVED';
+  bool get isRejected => status == 'REJECTED';
+
+  String get statusLabel {
+    switch (status) {
+      case 'PENDING':
+        return 'Pendente';
+      case 'APPROVED':
+        return 'Aprovado';
+      case 'REJECTED':
+        return 'Recusado';
+    }
+
+    return 'Indefinido';
+  }
 
   factory CustomerItem.fromJson(Map<String, dynamic> json) {
     return CustomerItem(
       id: json['id'] as String,
       name: json['name'] as String,
+      status: json['status'] as String? ?? 'APPROVED',
       cnpj: json['cnpj'] as String?,
+      phone: json['phone'] as String?,
     );
   }
 }
@@ -435,16 +508,23 @@ class AuthUser {
     required this.name,
     required this.email,
     required this.role,
+    this.phone,
+    this.profileImage,
     this.company,
+    this.customer,
   });
 
   final String id;
   final String name;
   final String email;
   final String role;
+  final String? phone;
+  final String? profileImage;
   final AuthCompany? company;
+  final AuthCustomer? customer;
 
   bool get isOwner => role == 'OWNER';
+  bool get canCreateOrders => isOwner || customer?.status == 'APPROVED';
 
   factory AuthUser.fromJson(Map<String, dynamic> json) {
     return AuthUser(
@@ -452,9 +532,31 @@ class AuthUser {
       name: json['name'] as String,
       email: json['email'] as String,
       role: json['role'] as String,
+      phone: json['phone'] as String?,
+      profileImage: json['profileImage'] as String?,
       company: json['company'] == null
           ? null
           : AuthCompany.fromJson(json['company'] as Map<String, dynamic>),
+      customer: json['customer'] == null
+          ? null
+          : AuthCustomer.fromJson(json['customer'] as Map<String, dynamic>),
+    );
+  }
+}
+
+class AuthCustomer {
+  const AuthCustomer({
+    required this.id,
+    required this.status,
+  });
+
+  final String id;
+  final String status;
+
+  factory AuthCustomer.fromJson(Map<String, dynamic> json) {
+    return AuthCustomer(
+      id: json['id'] as String,
+      status: json['status'] as String? ?? 'APPROVED',
     );
   }
 }
@@ -485,6 +587,7 @@ class AuthCompany {
 class OrderDto {
   const OrderDto({
     required this.id,
+    required this.number,
     this.customerId,
     required this.clientName,
     required this.productName,
@@ -498,10 +601,12 @@ class OrderDto {
     this.totalPrice,
     this.profit,
     this.referencePhoto,
+    this.refusalReason,
     this.notes,
   });
 
   final String id;
+  final int number;
   final String? customerId;
   final String clientName;
   final String productName;
@@ -515,6 +620,7 @@ class OrderDto {
   final double? totalPrice;
   final double? profit;
   final String? referencePhoto;
+  final String? refusalReason;
   final String? notes;
 
   factory OrderDto.fromJson(Map<String, dynamic> json) {
@@ -523,6 +629,7 @@ class OrderDto {
 
     return OrderDto(
       id: json['id'] as String,
+      number: _toInt(json['number']),
       customerId: customer?['id']?.toString(),
       clientName: customer?['name']?.toString() ??
           client?['name']?.toString() ??
@@ -538,6 +645,7 @@ class OrderDto {
       totalPrice: _optionalDouble(json['totalPrice']),
       profit: _optionalDouble(json['profit']),
       referencePhoto: json['referencePhoto'] as String?,
+      refusalReason: json['refusalReason'] as String?,
       notes: json['notes'] as String?,
     );
   }
@@ -545,6 +653,7 @@ class OrderDto {
   Order toOrder() {
     return Order(
       id: id,
+      number: number,
       customerId: customerId,
       clientName: clientName,
       productName: productName,
@@ -558,6 +667,7 @@ class OrderDto {
       apiTotalPrice: totalPrice,
       profit: profit,
       referencePhoto: referencePhoto,
+      refusalReason: refusalReason,
       notes: notes,
     );
   }
@@ -568,6 +678,14 @@ class OrderDto {
     }
 
     return double.parse(value.toString());
+  }
+
+  static int _toInt(dynamic value) {
+    if (value is int) {
+      return value;
+    }
+
+    return int.parse(value.toString());
   }
 
   static double? _optionalDouble(dynamic value) {

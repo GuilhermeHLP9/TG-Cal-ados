@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'orders_overview_screen.dart';
 import '../../../core/services/api_client.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/image_data.dart';
 import '../../auth/presentation/logout.dart';
 import '../../profile/presentation/profile_settings_screen.dart';
 
@@ -35,19 +36,17 @@ class _ClientHomeShellState extends State<ClientHomeShell> {
   @override
   Widget build(BuildContext context) {
     final screens = [
-      const OrdersOverviewScreen(),
-      ProfileSettingsScreen(
-        apiClient: widget.apiClient,
-        token: widget.token,
-        user: _user,
-        onUserChanged: (user) => setState(() => _user = user),
-      ),
+      OrdersOverviewScreen(user: _user),
     ];
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF0F3F4),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      drawer: _AppMenuDrawer(
+        user: _user,
+        onProfile: _openProfile,
+        onSettings: _openSettings,
+      ),
       appBar: AppBar(
-        automaticallyImplyLeading: false,
         toolbarHeight: 72,
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
@@ -55,7 +54,6 @@ class _ClientHomeShellState extends State<ClientHomeShell> {
         titleSpacing: 12,
         title: _ClientHeader(
           user: _user,
-          onProfileTap: () => setState(() => _currentIndex = 1),
         ),
       ),
       body: screens[_currentIndex],
@@ -65,16 +63,40 @@ class _ClientHomeShellState extends State<ClientHomeShell> {
       ),
     );
   }
+
+  void _openProfile() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ProfileSettingsScreen(
+          apiClient: widget.apiClient,
+          token: widget.token,
+          user: _user,
+          onUserChanged: (user) => setState(() => _user = user),
+        ),
+      ),
+    );
+  }
+
+  void _openSettings() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => AppSettingsScreen(
+          apiClient: widget.apiClient,
+          token: widget.token,
+          user: _user,
+          onUserChanged: (user) => setState(() => _user = user),
+        ),
+      ),
+    );
+  }
 }
 
 class _ClientHeader extends StatelessWidget {
   const _ClientHeader({
     required this.user,
-    required this.onProfileTap,
   });
 
   final AuthUser user;
-  final VoidCallback onProfileTap;
 
   @override
   Widget build(BuildContext context) {
@@ -97,46 +119,7 @@ class _ClientHeader extends StatelessWidget {
             ],
           ),
         ),
-        PopupMenuButton<String>(
-          tooltip: 'Menu do perfil',
-          offset: const Offset(0, 48),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          onSelected: (value) {
-            if (value == 'logout') {
-              logout(context);
-            }
-            if (value == 'profile') {
-              onProfileTap();
-            }
-          },
-          itemBuilder: (context) => const [
-            PopupMenuItem(
-              value: 'profile',
-              child: Row(
-                children: [
-                  Icon(Icons.person_outline),
-                  SizedBox(width: 10),
-                  Text('Perfil'),
-                ],
-              ),
-            ),
-            PopupMenuItem(
-              value: 'logout',
-              child: Row(
-                children: [
-                  Icon(Icons.logout),
-                  SizedBox(width: 10),
-                  Text('Sair'),
-                ],
-              ),
-            ),
-          ],
-          child: const CircleAvatar(
-            radius: 22,
-            backgroundColor: Colors.white,
-            child: Icon(Icons.person, color: AppColors.primary, size: 30),
-          ),
-        ),
+        _UserAvatar(user: user, radius: 22),
       ],
     );
   }
@@ -153,19 +136,19 @@ class _ClientBottomNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     const items = [
       (Icons.assignment_outlined, 'PEDIDOS'),
-      (Icons.settings_outlined, 'CONFIGURACOES'),
     ];
 
     return SafeArea(
       top: false,
       child: Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
+        decoration: BoxDecoration(
+          color: colors.surface,
           boxShadow: [
             BoxShadow(
-              color: Color(0x22000000),
+              color: Colors.black.withValues(alpha: 0.16),
               blurRadius: 10,
               offset: Offset(0, -2),
             ),
@@ -188,14 +171,14 @@ class _ClientBottomNav extends StatelessWidget {
                       height: 4,
                       width: 58,
                       decoration: BoxDecoration(
-                        color: selected ? AppColors.primary : Colors.transparent,
+                        color: selected ? colors.primary : Colors.transparent,
                         borderRadius: BorderRadius.circular(999),
                       ),
                     ),
                     const SizedBox(height: 8),
                     Icon(
                       item.$1,
-                      color: selected ? AppColors.primary : Colors.black87,
+                      color: selected ? colors.primary : colors.onSurfaceVariant,
                       size: 28,
                     ),
                     const SizedBox(height: 4),
@@ -205,7 +188,7 @@ class _ClientBottomNav extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
-                        color: selected ? AppColors.primary : Colors.black87,
+                        color: selected ? colors.primary : colors.onSurfaceVariant,
                       ),
                     ),
                   ],
@@ -219,113 +202,79 @@ class _ClientBottomNav extends StatelessWidget {
   }
 }
 
-class ClientChatScreen extends StatelessWidget {
-  const ClientChatScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Expanded(
-          child: Container(
-            color: const Color(0xFFF0F3F4),
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(18, 18, 18, 10),
-              children: const [
-                _IncomingBubble(
-                  title: 'Oi, tudo bem?',
-                  subtitle: 'Progresso do Pedido',
-                ),
-                SizedBox(height: 14),
-                _OutgoingBubble(
-                  text: 'Oh tando coricnuado nuo\ncapitullo deia em diz?',
-                ),
-                SizedBox(height: 14),
-                _IncomingBubble(
-                  title: '60%',
-                  subtitle: 'Progresso do Pedido',
-                ),
-                SizedBox(height: 14),
-                _OutgoingBubble(
-                  text: 'Empriesso, vaninuta\nnom teu somitado?',
-                ),
-                SizedBox(height: 14),
-                _IncomingBubble(
-                  title: '60%',
-                  subtitle: 'Progresso do Pedido',
-                ),
-              ],
-            ),
-          ),
-        ),
-        const _ComposerBar(),
-      ],
-    );
-  }
-}
-
-class _IncomingBubble extends StatelessWidget {
-  const _IncomingBubble({
-    required this.title,
-    required this.subtitle,
+class _AppMenuDrawer extends StatelessWidget {
+  const _AppMenuDrawer({
+    required this.user,
+    required this.onProfile,
+    required this.onSettings,
   });
 
-  final String title;
-  final String subtitle;
+  final AuthUser user;
+  final VoidCallback onProfile;
+  final VoidCallback onSettings;
 
   @override
   Widget build(BuildContext context) {
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: Container(
-        width: 190,
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: const [
-            BoxShadow(
-              color: Color(0x0F000000),
-              blurRadius: 8,
-              offset: Offset(0, 3),
-            ),
-          ],
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    final colors = Theme.of(context).colorScheme;
+
+    return Drawer(
+      child: SafeArea(
+        child: Column(
           children: [
-            Container(
-              width: 5,
-              height: 44,
-              decoration: BoxDecoration(
-                color: AppColors.chatIncomingAccent,
-                borderRadius: BorderRadius.circular(999),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Row(
                 children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.black87,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: Colors.black87,
+                  _UserAvatar(user: user, radius: 24),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          user.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontWeight: FontWeight.w900),
+                        ),
+                        Text(
+                          user.email,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(color: colors.onSurfaceVariant),
+                        ),
+                      ],
                     ),
                   ),
                 ],
               ),
             ),
+            const Divider(height: 1),
+            ListTile(
+              leading: const Icon(Icons.person_outline),
+              title: const Text('Perfil'),
+              subtitle: const Text('Perfil e seguranca'),
+              onTap: () {
+                Navigator.of(context).pop();
+                onProfile();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.settings_outlined),
+              title: const Text('Configuracoes'),
+              subtitle: const Text('Dados, tema, privacidade e sobre'),
+              onTap: () {
+                Navigator.of(context).pop();
+                onSettings();
+              },
+            ),
+            const Spacer(),
+            const Divider(height: 1),
+            ListTile(
+              leading: const Icon(Icons.logout),
+              title: const Text('Sair'),
+              onTap: () => logout(context),
+            ),
           ],
         ),
       ),
@@ -333,96 +282,33 @@ class _IncomingBubble extends StatelessWidget {
   }
 }
 
-class _OutgoingBubble extends StatelessWidget {
-  const _OutgoingBubble({required this.text});
+class _UserAvatar extends StatelessWidget {
+  const _UserAvatar({
+    required this.user,
+    required this.radius,
+  });
 
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Align(
-      alignment: Alignment.centerRight,
-      child: Container(
-        constraints: const BoxConstraints(maxWidth: 230),
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
-        decoration: BoxDecoration(
-          color: AppColors.chatOutgoing,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: const [
-            BoxShadow(
-              color: Color(0x12000000),
-              blurRadius: 8,
-              offset: Offset(0, 3),
-            ),
-          ],
-        ),
-        child: Text(
-          text,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 14,
-            height: 1.2,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ComposerBar extends StatelessWidget {
-  const _ComposerBar();
+  final AuthUser user;
+  final double radius;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(8, 8, 8, 10),
-      color: Colors.white,
-      child: SafeArea(
-        top: false,
-        child: Row(
-          children: [
-            IconButton(
-              tooltip: 'Anexar arquivo',
-              onPressed: () {},
-              icon: const Icon(Icons.attach_file, color: AppColors.primary),
-            ),
-            IconButton(
-              tooltip: 'Enviar imagem',
-              onPressed: () {},
-              icon: const Icon(Icons.image_outlined, color: AppColors.primary),
-            ),
-            Expanded(
-              child: TextField(
-                minLines: 1,
-                maxLines: 3,
-                decoration: InputDecoration(
-                  hintText: 'Mensagem',
-                  isDense: true,
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(24),
-                    borderSide: const BorderSide(color: Color(0xFFCED7DE)),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(24),
-                    borderSide: const BorderSide(color: Color(0xFFCED7DE)),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 6),
-            IconButton.filled(
-              tooltip: 'Enviar mensagem',
-              onPressed: () {},
-              style: IconButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
-              ),
-              icon: const Icon(Icons.send),
-            ),
-          ],
-        ),
+    final bytes = imageBytesFromDataUrl(user.profileImage);
+
+    if (bytes != null) {
+      return CircleAvatar(
+        radius: radius,
+        backgroundImage: MemoryImage(bytes),
+      );
+    }
+
+    return CircleAvatar(
+      radius: radius,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      child: Icon(
+        Icons.person,
+        color: Theme.of(context).colorScheme.primary,
+        size: 30,
       ),
     );
   }

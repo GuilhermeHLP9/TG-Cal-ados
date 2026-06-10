@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../../../core/services/api_client.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/image_data.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../orders/data/order_store.dart';
 
@@ -56,7 +57,7 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF0F3F4),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text('Novo pedido'),
         backgroundColor: AppColors.primary,
@@ -260,10 +261,10 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       'Revisar pedido',
                       style: TextStyle(
-                        color: AppColors.text,
+                        color: Theme.of(context).colorScheme.onSurface,
                         fontSize: 24,
                         fontWeight: FontWeight.w900,
                       ),
@@ -384,13 +385,15 @@ class _CreateOrderHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Column(
+    final colors = Theme.of(context).colorScheme;
+
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           'Criar pedido',
           style: TextStyle(
-            color: AppColors.text,
+            color: colors.onSurface,
             fontSize: 28,
             fontWeight: FontWeight.w900,
           ),
@@ -399,7 +402,7 @@ class _CreateOrderHeader extends StatelessWidget {
         Text(
           'Escolha o cliente e informe os detalhes do solado para producao.',
           style: TextStyle(
-            color: AppColors.muted,
+            color: colors.onSurfaceVariant,
             fontWeight: FontWeight.w700,
           ),
         ),
@@ -559,6 +562,7 @@ class _OrderTotalPreviewState extends State<_OrderTotalPreview> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     final quantity = int.tryParse(widget.quantityController.text.trim()) ?? 0;
     final price = double.tryParse(
           widget.priceController.text.trim().replaceAll(',', '.'),
@@ -569,12 +573,12 @@ class _OrderTotalPreviewState extends State<_OrderTotalPreview> {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFFEAF3F7),
+        color: colors.primary.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(14),
       ),
       child: Row(
         children: [
-          const Icon(Icons.payments_outlined, color: AppColors.primary),
+          Icon(Icons.payments_outlined, color: colors.primary),
           const SizedBox(width: 10),
           const Expanded(
             child: Text(
@@ -584,8 +588,8 @@ class _OrderTotalPreviewState extends State<_OrderTotalPreview> {
           ),
           Text(
             'R\$ ${total.toStringAsFixed(2)}',
-            style: const TextStyle(
-              color: AppColors.primaryDark,
+            style: TextStyle(
+              color: colors.primary,
               fontWeight: FontWeight.w900,
             ),
           ),
@@ -606,6 +610,8 @@ class _ReviewLine extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Row(
@@ -615,8 +621,8 @@ class _ReviewLine extends StatelessWidget {
             width: 120,
             child: Text(
               label,
-              style: const TextStyle(
-                color: AppColors.muted,
+              style: TextStyle(
+                color: colors.onSurfaceVariant,
                 fontWeight: FontWeight.w800,
               ),
             ),
@@ -646,19 +652,68 @@ class _ReferenceImageField extends StatefulWidget {
 }
 
 class _ReferenceImageFieldState extends State<_ReferenceImageField> {
+  bool _picking = false;
+
   @override
   Widget build(BuildContext context) {
     final hasImage = widget.controller.text.isNotEmpty;
+    final bytes = imageBytesFromDataUrl(widget.controller.text);
 
-    return OutlinedButton.icon(
-      onPressed: () {
-        setState(() {
-          widget.controller.text = 'referencia_solado.jpg';
-        });
-      },
-      icon: Icon(hasImage ? Icons.check_circle : Icons.image_outlined),
-      label: Text(hasImage ? widget.controller.text : 'Selecionar imagem'),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (hasImage && bytes != null) ...[
+          ClipRRect(
+            borderRadius: BorderRadius.circular(14),
+            child: Image.memory(
+              bytes,
+              height: 180,
+              fit: BoxFit.cover,
+            ),
+          ),
+          const SizedBox(height: 10),
+        ],
+        OutlinedButton.icon(
+          onPressed: _picking ? null : _pickImage,
+          icon: Icon(hasImage ? Icons.image_outlined : Icons.add_photo_alternate),
+          label: Text(
+            _picking
+                ? 'Abrindo galeria...'
+                : hasImage
+                    ? 'Trocar imagem'
+                    : 'Selecionar imagem',
+          ),
+        ),
+        if (hasImage) ...[
+          const SizedBox(height: 8),
+          TextButton.icon(
+            onPressed: () {
+              setState(() => widget.controller.clear());
+            },
+            icon: const Icon(Icons.delete_outline),
+            label: const Text('Remover imagem'),
+          ),
+        ],
+      ],
     );
+  }
+
+  Future<void> _pickImage() async {
+    setState(() => _picking = true);
+
+    try {
+      final dataUrl = await pickImageDataUrl();
+
+      if (!mounted || dataUrl == null) {
+        return;
+      }
+
+      setState(() => widget.controller.text = dataUrl);
+    } finally {
+      if (mounted) {
+        setState(() => _picking = false);
+      }
+    }
   }
 }
 

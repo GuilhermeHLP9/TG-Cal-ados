@@ -3,6 +3,7 @@ import '../../../core/models/order.dart';
 const mockOrders = [
   Order(
     id: 'PED-001',
+    number: 1,
     clientName: 'Calcados Franca Norte',
     productName: 'Solado Runner',
     sizes: '34 ao 40',
@@ -15,6 +16,7 @@ const mockOrders = [
   ),
   Order(
     id: 'PED-002',
+    number: 2,
     clientName: 'Atelie Couro Fino',
     productName: 'Solado Casual',
     sizes: '36 ao 42',
@@ -26,6 +28,7 @@ const mockOrders = [
   ),
   Order(
     id: 'PED-003',
+    number: 3,
     clientName: 'Linha Urbana',
     productName: 'Solado Street',
     sizes: '38 ao 44',
@@ -37,6 +40,7 @@ const mockOrders = [
   ),
   Order(
     id: 'PED-004',
+    number: 4,
     clientName: 'Calcados Avenida',
     productName: 'Solado Classic',
     sizes: '35 ao 39',
@@ -48,6 +52,7 @@ const mockOrders = [
   ),
   Order(
     id: 'PED-005',
+    number: 5,
     clientName: 'Studio Calcados',
     productName: 'Solado Leve',
     sizes: '33 ao 38',

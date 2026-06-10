@@ -24,6 +24,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _companyFormKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
+  final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   final _companyNameController = TextEditingController();
@@ -39,6 +40,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   void dispose() {
     _nameController.dispose();
     _emailController.dispose();
+    _phoneController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     _companyNameController.dispose();
@@ -98,6 +100,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       final session = await widget.apiClient.register(
         name: _nameController.text.trim(),
         email: _emailController.text.trim().toLowerCase(),
+        phone: _phoneController.text.trim(),
         password: _passwordController.text,
         companyName: _companyNameController.text.trim(),
         companyCnpj: _companyCnpjController.text.trim(),
@@ -127,7 +130,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF0F3F4),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text('Criar conta'),
         backgroundColor: AppColors.primary,
@@ -192,6 +195,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
               }
             },
             validator: _emailValidator,
+          ),
+          const SizedBox(height: 16),
+          Text('Telefone', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 8),
+          TextFormField(
+            controller: _phoneController,
+            keyboardType: TextInputType.phone,
+            textInputAction: TextInputAction.next,
+            inputFormatters: const [_PhoneInputFormatter()],
+            decoration: const InputDecoration(
+              hintText: '(00) 00000-0000',
+            ),
+            validator: _phoneValidator,
           ),
           const SizedBox(height: 16),
           Text('Senha', style: Theme.of(context).textTheme.titleMedium),
@@ -306,6 +322,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
     return null;
   }
 
+  String? _phoneValidator(String? value) {
+    final digits = (value ?? '').replaceAll(RegExp(r'[^0-9]'), '');
+
+    if (digits.length < 10 || digits.length > 11) {
+      return 'Informe um telefone valido.';
+    }
+
+    return null;
+  }
+
   String? _passwordValidator(String? value) {
     if ((value ?? '').length < 6) {
       return 'A senha precisa ter pelo menos 6 caracteres.';
@@ -375,18 +401,22 @@ class _StepPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
     return Expanded(
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 10),
         decoration: BoxDecoration(
-          color: selected ? AppColors.primary : const Color(0xFFEAF3F7),
+          color: selected
+              ? colors.primary
+              : colors.primary.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Text(
           label,
           textAlign: TextAlign.center,
           style: TextStyle(
-            color: selected ? Colors.white : AppColors.primaryDark,
+            color: selected ? colors.onPrimary : colors.primary,
             fontWeight: FontWeight.w800,
           ),
         ),
@@ -400,18 +430,20 @@ class _CompanyHelp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFFEAF3F7),
+        color: colors.primary.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: colors.outlineVariant),
       ),
       child: Text(
         'Esta conta sera criada como cliente e vinculada ao proprietario cadastrado.',
-        style: const TextStyle(
-          color: AppColors.primaryDark,
+        style: TextStyle(
+          color: colors.primary,
           fontWeight: FontWeight.w700,
         ),
       ),
@@ -446,6 +478,39 @@ class _CnpjInputFormatter extends TextInputFormatter {
 
     final text = buffer.toString();
 
+    return TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
+    );
+  }
+}
+
+class _PhoneInputFormatter extends TextInputFormatter {
+  const _PhoneInputFormatter();
+
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final digits = newValue.text.replaceAll(RegExp(r'[^0-9]'), '');
+    final limited = digits.length > 11 ? digits.substring(0, 11) : digits;
+    final buffer = StringBuffer();
+
+    for (var i = 0; i < limited.length; i++) {
+      if (i == 0) {
+        buffer.write('(');
+      }
+      if (i == 2) {
+        buffer.write(') ');
+      }
+      if ((limited.length <= 10 && i == 6) || (limited.length == 11 && i == 7)) {
+        buffer.write('-');
+      }
+      buffer.write(limited[i]);
+    }
+
+    final text = buffer.toString();
     return TextEditingValue(
       text: text,
       selection: TextSelection.collapsed(offset: text.length),

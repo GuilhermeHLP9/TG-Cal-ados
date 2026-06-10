@@ -58,25 +58,29 @@ class CustomerStore extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> updateCustomer({
-    required String id,
-    required String name,
-    String? cnpj,
-  }) async {
-    final customer = await _apiClient.updateCustomer(
+  Future<void> deleteCustomer(String id) async {
+    await _apiClient.deleteCustomer(
       token: _token,
       id: id,
-      name: name,
-      cnpj: cnpj,
     );
-    final index = _customers.indexWhere((item) => item.id == id);
 
+    _customers.removeWhere((customer) => customer.id == id);
+    notifyListeners();
+  }
+
+  Future<void> updateStatus(String id, String status) async {
+    final customer = await _apiClient.updateCustomerStatus(
+      token: _token,
+      id: id,
+      status: status,
+    );
+
+    final index = _customers.indexWhere((item) => item.id == id);
     if (index == -1) {
       _customers.add(customer);
     } else {
       _customers[index] = customer;
     }
-
     _customers.sort(
       (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
     );
