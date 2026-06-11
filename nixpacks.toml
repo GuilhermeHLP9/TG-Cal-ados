@@ -1,0 +1,11 @@
+[phases.install]
+cmds = ["npm ci"]
+
+[phases.build]
+cmds = [
+  "npm run prisma:generate --workspace api",
+  "npm run build --workspace api"
+]
+
+[start]
+cmd = "npm run start:prod --workspace api"
