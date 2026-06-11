@@ -1,0 +1,28 @@
+services:
+  - type: web
+    name: solex-api
+    runtime: node
+    rootDir: .
+    buildCommand: npm ci && npm run prisma:generate --workspace api && npm run build --workspace api
+    startCommand: npm run start:prod --workspace api
+    healthCheckPath: /api/health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: solex-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: CORS_ORIGIN
+        value: "*"
+      - key: NODE_ENV
+        value: production
+      - key: EMAIL_FROM
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: BREVO_API_KEY
+        sync: false
+
+databases:
+  - name: solex-db

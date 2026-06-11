@@ -39,18 +39,6 @@ npm.cmd run seed --workspace api
 npm.cmd run api
 ```
 
-Contas demo criadas pelo seed:
-
-```text
-cliente@calcados.com / 123456
-dono@calcados.com / 123456
-```
-
-Por padrao, o Flutter usa `http://localhost:3333/api`. Em emulador Android, rode
-o app com `--dart-define=API_BASE_URL=http://10.0.2.2:3333/api`.
-Em celular fisico com USB e `adb reverse tcp:3333 tcp:3333`, use
-`--dart-define=API_BASE_URL=http://127.0.0.1:3333/api`.
-
 ## Organização do Flutter
 
 ```text
@@ -70,7 +58,7 @@ lib/
 ## MVP atual no Flutter
 
 - login real pela API para cliente e proprietario
-- cadastro cria apenas usuario cliente, vinculado a empresa do proprietario
+- cadastro cria apenas usuario cliente vinculado ao proprietario
 - area do cliente com pedidos e criacao de pedido
 - area do proprietario com notas, clientes, pedidos, financeiro e configuracoes
-- pedidos carregados e atualizados pelo backend local
+- dados carregados e atualizados pelo backend local

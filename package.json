@@ -1,0 +1,11 @@
+{
+  "name": "sistema-gestao-calcados",
+  "private": true,
+  "workspaces": [
+    "apps/api"
+  ],
+  "scripts": {
+    "api": "npm run dev --workspace api",
+    "typecheck:api": "npm run typecheck --workspace api"
+  }
+}

@@ -1,0 +1,7 @@
+CREATE TYPE "CustomerStatus" AS ENUM ('PENDING', 'APPROVED', 'REJECTED');
+
+ALTER TABLE "Customer"
+ADD COLUMN "status" "CustomerStatus" NOT NULL DEFAULT 'APPROVED';
+
+ALTER TABLE "Customer"
+ALTER COLUMN "status" SET DEFAULT 'PENDING';

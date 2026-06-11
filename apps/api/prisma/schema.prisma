@@ -1,0 +1,140 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  CLIENT
+  OWNER
+}
+
+enum OrderStatus {
+  RECEBIDO
+  NOVO
+  EM_PRODUCAO
+  PARA_ENTREGA
+  RECUSADO
+}
+
+enum CustomerStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model User {
+  id           String    @id @default(cuid())
+  name         String
+  email        String    @unique
+  phone        String?
+  profileImage String?   @db.Text
+  passwordHash String
+  role         UserRole
+  companyId    String?
+  company      Company?  @relation(fields: [companyId], references: [id])
+  customerId   String?
+  customer     Customer? @relation(fields: [customerId], references: [id])
+  orders       Order[]
+  messages     Message[]
+  notes        Note[]
+  passwordResetTokens PasswordResetToken[]
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model Company {
+  id             String   @id @default(cuid())
+  name           String
+  email          String?
+  cnpj           String?  @unique
+  normalizedName String   @unique
+  users          User[]
+  customers      Customer[]
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model Customer {
+  id             String   @id @default(cuid())
+  companyId      String
+  company        Company  @relation(fields: [companyId], references: [id])
+  name           String
+  cnpj           String?
+  phone          String?
+  status         CustomerStatus @default(PENDING)
+  normalizedName String
+  users          User[]
+  orders         Order[]
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([companyId, normalizedName])
+  @@unique([companyId, cnpj])
+  @@index([companyId])
+}
+
+model Order {
+  id           String       @id @default(cuid())
+  number       Int          @unique @default(autoincrement())
+  clientId     String
+  client       User         @relation(fields: [clientId], references: [id])
+  customerId   String?
+  customer     Customer?    @relation(fields: [customerId], references: [id])
+  productName  String
+  soleType     String?
+  sizes        String
+  materials    String
+  quantity     Int
+  pricePerPair Decimal      @db.Decimal(10, 2)
+  dueDate      DateTime
+  referencePhoto String? @db.Text
+  notes        String?
+  refusalReason String?  @db.Text
+  status       OrderStatus  @default(RECEBIDO)
+  materialCost Decimal?     @db.Decimal(10, 2)
+  totalPrice   Decimal?     @db.Decimal(10, 2)
+  profit       Decimal?     @db.Decimal(10, 2)
+  messages     Message[]
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  orderId   String
+  senderId  String
+  content   String
+  order     Order    @relation(fields: [orderId], references: [id])
+  sender    User     @relation(fields: [senderId], references: [id])
+  createdAt DateTime @default(now())
+}
+
+model Note {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  title     String   @default("Sem titulo")
+  content   String   @default("") @db.Text
+  isFavorite Boolean @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
