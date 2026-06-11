@@ -611,6 +611,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
   late AuthUser _user;
   bool _refreshing = false;
   bool _testingApi = false;
+  bool _testingNotifications = false;
 
   @override
   void initState() {
@@ -695,6 +696,14 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
             onTap: _testApi,
           ),
           const Divider(height: 18),
+          _SettingsAction(
+            icon: Icons.notifications_active_outlined,
+            title: 'Testar notificacoes',
+            subtitle: 'Envia um aviso de teste para este aparelho.',
+            isBusy: _testingNotifications,
+            onTap: _testNotification,
+          ),
+          const Divider(height: 18),
           _InfoLine(label: 'API atual', value: widget.apiClient.baseUrl),
         ],
       ),
@@ -736,14 +745,17 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
           _SettingsAction(
             icon: Icons.privacy_tip_outlined,
             title: 'Politica de privacidade',
-            subtitle: 'Como o Solex trata os dados do app.',
+            subtitle: 'Dados, seguranca e notificacoes do Solex.',
             onTap: _openPrivacy,
           ),
           const Divider(height: 18),
           const _InfoLine(label: 'App', value: 'Solex'),
           const _InfoLine(label: 'Versao', value: '1.0.0'),
-          const _InfoLine(label: 'Plataforma', value: 'Flutter'),
-          const _InfoLine(label: 'Ambiente', value: 'Backend local'),
+          const _InfoLine(label: 'Plataforma', value: 'Flutter Android/Web'),
+          const _InfoLine(label: 'Backend', value: 'Node.js, Express e Prisma'),
+          const _InfoLine(label: 'Banco', value: 'PostgreSQL'),
+          const _InfoLine(label: 'Notificacoes', value: 'Firebase Cloud Messaging'),
+          const _InfoLine(label: 'Ambiente', value: 'Producao online'),
         ],
       ),
     );
@@ -788,6 +800,42 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
     } finally {
       if (mounted) {
         setState(() => _testingApi = false);
+      }
+    }
+  }
+
+  Future<void> _testNotification() async {
+    setState(() => _testingNotifications = true);
+
+    try {
+      final result = await widget.apiClient.testNotification(widget.token);
+
+      if (!mounted) {
+        return;
+      }
+
+      if (!result.configured) {
+        _showMessage(context, 'Firebase ainda nao esta configurado na API.');
+      } else if (!result.hasRegisteredDevice) {
+        _showMessage(
+          context,
+          'Este usuario ainda nao registrou um aparelho para notificacoes. Feche e abra o app, faca login novamente e aceite a permissao.',
+        );
+      } else if (result.wasSent) {
+        _showMessage(context, 'Notificacao de teste enviada.');
+      } else {
+        _showMessage(
+          context,
+          'A API encontrou ${result.devices} aparelho(s), mas o Firebase nao confirmou envio.',
+        );
+      }
+    } on ApiException catch (error) {
+      if (mounted) {
+        _showMessage(context, error.message);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _testingNotifications = false);
       }
     }
   }
@@ -841,12 +889,17 @@ class PrivacyPolicyScreen extends StatelessWidget {
                 _PolicyText(
                   title: 'Armazenamento',
                   body:
-                      'Os dados ficam no banco PostgreSQL configurado para o backend local do projeto. Senhas sao armazenadas de forma protegida por hash.',
+                      'Os dados ficam no banco PostgreSQL usado pela API online. Senhas sao armazenadas de forma protegida por hash.',
+                ),
+                _PolicyText(
+                  title: 'Notificacoes',
+                  body:
+                      'O app usa Firebase Cloud Messaging para avisos de clientes, pedidos e mudancas de status. Tokens de notificacao sao vinculados ao usuario logado para entregar esses avisos.',
                 ),
                 _PolicyText(
                   title: 'Compartilhamento',
                   body:
-                      'O app nao possui compartilhamento automatico com terceiros, notificacoes externas ou chat ativo no escopo atual.',
+                      'O app nao possui chat ativo nem compartilhamento automatico de dados comerciais com terceiros. O Firebase e usado apenas para entrega tecnica de notificacoes.',
                 ),
                 _PolicyText(
                   title: 'Controle',

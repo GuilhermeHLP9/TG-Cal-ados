@@ -112,6 +112,16 @@ class ApiClient {
     );
   }
 
+  Future<NotificationTestResult> testNotification(String token) async {
+    final response = await _post(
+      '/notifications/test',
+      token: token,
+      body: {},
+    );
+
+    return NotificationTestResult.fromJson(response as Map<String, dynamic>);
+  }
+
   Future<AuthUser> updateMe({
     required String token,
     String? name,
@@ -498,6 +508,44 @@ class ApiException implements Exception {
 
   @override
   String toString() => message;
+}
+
+class NotificationTestResult {
+  const NotificationTestResult({
+    required this.configured,
+    required this.devices,
+    required this.sent,
+    required this.failed,
+  });
+
+  final bool configured;
+  final int devices;
+  final int sent;
+  final int failed;
+
+  bool get hasRegisteredDevice => devices > 0;
+  bool get wasSent => sent > 0;
+
+  factory NotificationTestResult.fromJson(Map<String, dynamic> json) {
+    return NotificationTestResult(
+      configured: json['configured'] == true,
+      devices: _jsonToInt(json['devices']),
+      sent: _jsonToInt(json['sent']),
+      failed: _jsonToInt(json['failed']),
+    );
+  }
+
+  static int _jsonToInt(dynamic value) {
+    if (value is int) {
+      return value;
+    }
+
+    if (value is num) {
+      return value.toInt();
+    }
+
+    return int.tryParse(value?.toString() ?? '') ?? 0;
+  }
 }
 
 class AuthSession {

@@ -8,6 +8,13 @@ type PushPayload = {
   data?: Record<string, string>;
 };
 
+type PushResult = {
+  configured: boolean;
+  devices: number;
+  sent: number;
+  failed: number;
+};
+
 let messaging: admin.messaging.Messaging | null | undefined;
 
 export async function registerDeviceToken(
@@ -29,17 +36,20 @@ export async function registerDeviceToken(
   });
 }
 
-export async function notifyUsers(userIds: string[], payload: PushPayload) {
+export async function notifyUsers(
+  userIds: string[],
+  payload: PushPayload
+): Promise<PushResult> {
   const uniqueUserIds = Array.from(new Set(userIds.filter(Boolean)));
 
   if (uniqueUserIds.length === 0) {
-    return;
+    return emptyResult(true);
   }
 
   const firebaseMessaging = getMessaging();
 
   if (!firebaseMessaging) {
-    return;
+    return emptyResult(false);
   }
 
   const devices = await prisma.notificationDevice.findMany({
@@ -52,7 +62,7 @@ export async function notifyUsers(userIds: string[], payload: PushPayload) {
   const tokens = devices.map((device) => device.token);
 
   if (tokens.length === 0) {
-    return;
+    return emptyResult(true);
   }
 
   try {
@@ -88,8 +98,21 @@ export async function notifyUsers(userIds: string[], payload: PushPayload) {
         where: { token: { in: invalidTokens } }
       });
     }
+
+    return {
+      configured: true,
+      devices: tokens.length,
+      sent: response.successCount,
+      failed: response.failureCount
+    };
   } catch (error) {
     console.error("[Solex] Falha ao enviar push", error);
+    return {
+      configured: true,
+      devices: tokens.length,
+      sent: 0,
+      failed: tokens.length
+    };
   }
 }
 
@@ -109,6 +132,25 @@ export async function notifyCompanyOwners(
     owners.map((owner) => owner.id),
     payload
   );
+}
+
+export async function sendTestNotification(userId: string) {
+  return notifyUsers([userId], {
+    title: "Teste do Solex",
+    body: "As notificacoes estao configuradas neste aparelho.",
+    data: {
+      type: "notification_test"
+    }
+  });
+}
+
+function emptyResult(configured: boolean): PushResult {
+  return {
+    configured,
+    devices: 0,
+    sent: 0,
+    failed: 0
+  };
 }
 
 function getMessaging() {

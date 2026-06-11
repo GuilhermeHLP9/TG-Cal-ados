@@ -13,3 +13,9 @@ export async function registerDevice(request: Request, response: Response) {
 
   return response.status(204).send();
 }
+
+export async function testNotification(request: Request, response: Response) {
+  const result = await notificationsService.sendTestNotification(request.user!.id);
+
+  return response.json(result);
+}

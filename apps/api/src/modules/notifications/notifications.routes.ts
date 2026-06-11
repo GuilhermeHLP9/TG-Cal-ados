@@ -10,3 +10,7 @@ notificationsRoutes.post(
   "/device",
   asyncHandler(notificationsController.registerDevice)
 );
+notificationsRoutes.post(
+  "/test",
+  asyncHandler(notificationsController.testNotification)
+);

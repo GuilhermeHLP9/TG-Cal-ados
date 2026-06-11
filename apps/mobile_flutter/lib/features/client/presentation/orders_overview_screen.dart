@@ -63,6 +63,8 @@ class _OrdersOverviewScreenState extends State<OrdersOverviewScreen> {
             totalOrders: orders.length,
             visibleOrders: visibleOrders.length,
             canCreate: widget.user.canCreateOrders,
+            isLoading: store.isLoading,
+            onRefresh: store.loadOrders,
             onCreate: () => _openCreateOrder(store),
           ),
           if (!widget.user.canCreateOrders) ...[
@@ -175,12 +177,16 @@ class _ClientOrdersHeader extends StatelessWidget {
     required this.totalOrders,
     required this.visibleOrders,
     required this.canCreate,
+    required this.isLoading,
+    required this.onRefresh,
     required this.onCreate,
   });
 
   final int totalOrders;
   final int visibleOrders;
   final bool canCreate;
+  final bool isLoading;
+  final VoidCallback onRefresh;
   final VoidCallback onCreate;
 
   @override
@@ -213,14 +219,31 @@ class _ClientOrdersHeader extends StatelessWidget {
             ],
           ),
         ),
-        IconButton.filled(
-          tooltip: 'Criar pedido',
-          onPressed: canCreate ? onCreate : null,
-          style: IconButton.styleFrom(
-            backgroundColor: AppColors.primary,
-            foregroundColor: Colors.white,
-          ),
-          icon: const Icon(Icons.add),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton.filledTonal(
+              tooltip: 'Atualizar pedidos',
+              onPressed: isLoading ? null : onRefresh,
+              icon: isLoading
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.refresh),
+            ),
+            const SizedBox(width: 8),
+            IconButton.filled(
+              tooltip: 'Criar pedido',
+              onPressed: canCreate ? onCreate : null,
+              style: IconButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+              ),
+              icon: const Icon(Icons.add),
+            ),
+          ],
         ),
       ],
     );
