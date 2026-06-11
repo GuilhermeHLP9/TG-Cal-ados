@@ -7,10 +7,14 @@ import 'package:mobile_flutter/features/client/presentation/client_home_shell.da
 import 'package:mobile_flutter/features/owner/presentation/owner_home_shell.dart';
 import 'package:mobile_flutter/features/notes/data/note_store.dart';
 import 'package:mobile_flutter/features/orders/data/order_store.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   testWidgets('login screen is rendered', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+
     await tester.pumpWidget(const SolexApp());
+    await tester.pumpAndSettle();
 
     expect(find.text('Solex'), findsOneWidget);
     expect(find.text('Entrar'), findsOneWidget);

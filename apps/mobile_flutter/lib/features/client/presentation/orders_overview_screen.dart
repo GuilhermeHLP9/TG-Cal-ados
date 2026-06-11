@@ -64,7 +64,7 @@ class _OrdersOverviewScreenState extends State<OrdersOverviewScreen> {
             visibleOrders: visibleOrders.length,
             canCreate: widget.user.canCreateOrders,
             isLoading: store.isLoading,
-            onRefresh: store.loadOrders,
+            onRefresh: () => _refreshOrders(store),
             onCreate: () => _openCreateOrder(store),
           ),
           if (!widget.user.canCreateOrders) ...[
@@ -125,6 +125,19 @@ class _OrdersOverviewScreenState extends State<OrdersOverviewScreen> {
       _filter = _ClientOrderFilter.all;
       _searchController.clear();
     });
+  }
+
+  Future<void> _refreshOrders(OrderStore store) async {
+    await store.loadOrders();
+
+    if (!mounted) {
+      return;
+    }
+
+    final message = store.error ?? 'Pedidos atualizados.';
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
   }
 
   void _openCreateOrder(OrderStore store) {

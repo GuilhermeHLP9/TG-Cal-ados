@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../../../core/services/api_client.dart';
 import '../../../../core/services/notification_service.dart';
+import '../../../../core/services/session_storage.dart';
 import '../../client/presentation/client_home_shell.dart';
 import '../../notes/data/note_store.dart';
 import '../../orders/data/order_store.dart';
@@ -11,7 +14,12 @@ void openAuthenticatedHome(
   BuildContext context, {
   required ApiClient apiClient,
   required AuthSession session,
+  bool persistSession = true,
 }) {
+  if (persistSession) {
+    unawaited(SessionStorage.saveToken(session.token));
+  }
+
   NotificationService.registerDevice(
     apiClient: apiClient,
     token: session.token,

@@ -434,6 +434,7 @@ class _EditCompanyScreenState extends State<EditCompanyScreen> {
             TextFormField(
               controller: _cnpjController,
               keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
               decoration: const InputDecoration(labelText: 'CNPJ'),
               validator: (value) {
                 if (_onlyDigits(value ?? '').length != 14) {

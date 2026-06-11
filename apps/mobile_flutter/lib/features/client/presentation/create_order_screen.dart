@@ -99,13 +99,17 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
                       label: 'Tamanhos / numeracao',
                       hint: 'Ex.: 34 ao 40, grade 36/37/38',
                       controller: _sizesController,
-                      validator: _required,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.deny(RegExp(r'-')),
+                      ],
+                      validator: _sizes,
                     ),
                     _Field(
                       label: 'Quantidade de pares',
                       hint: 'Ex.: 120',
                       controller: _quantityController,
                       keyboardType: TextInputType.number,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                       validator: _positiveInt,
                     ),
                     _Field(
@@ -126,7 +130,11 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
                       label: 'Preco por par',
                       hint: 'Ex.: 18.50',
                       controller: _priceController,
-                      keyboardType: TextInputType.number,
+                      keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
+                      inputFormatters: [
+                        FilteringTextInputFormatter.allow(RegExp(r'[0-9,.]')),
+                      ],
                       validator: _positiveMoney,
                     ),
                     _OrderTotalPreview(
@@ -338,6 +346,20 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
 
     if (number == null || number <= 0) {
       return 'Informe um numero maior que zero.';
+    }
+
+    return null;
+  }
+
+  String? _sizes(String? value) {
+    final requiredError = _required(value);
+
+    if (requiredError != null) {
+      return requiredError;
+    }
+
+    if ((value ?? '').contains('-')) {
+      return 'Nao informe numeracao negativa.';
     }
 
     return null;

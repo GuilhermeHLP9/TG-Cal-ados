@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../core/models/order.dart';
 import '../../../core/services/api_client.dart';
@@ -443,6 +444,9 @@ class _FinancialCardState extends State<_FinancialCard> {
           TextField(
             controller: _materialCostController,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(RegExp(r'[0-9,.]')),
+            ],
             decoration: const InputDecoration(
               labelText: 'Custo de material',
               prefixText: 'R\$ ',
