@@ -1,6 +1,7 @@
 import { OrderStatus } from "@prisma/client";
 import { prisma } from "../../lib/prisma";
 import { HttpError } from "../../utils/http-error";
+import { notifyUsers } from "../notifications/notifications.service";
 
 type CustomerStatusInput = "APPROVED" | "REJECTED";
 const CLOSED_ORDER_STATUSES: OrderStatus[] = [
@@ -109,11 +110,33 @@ export async function updateCustomerStatus(
   const companyId = await getOwnerCompanyId(ownerId);
   await ensureCustomerBelongsToCompany(companyId, customerId);
 
-  return prisma.customer.update({
+  const customer = await prisma.customer.update({
     where: { id: customerId },
     data: { status },
     select: customerSelect
   });
+
+  const users = await prisma.user.findMany({
+    where: { customerId },
+    select: { id: true }
+  });
+
+  void notifyUsers(
+    users.map((user) => user.id),
+    {
+      title: status === "APPROVED" ? "Cadastro aceito" : "Cadastro recusado",
+      body:
+        status === "APPROVED"
+          ? "Seu cadastro foi aceito. Voce ja pode criar pedidos."
+          : "Seu cadastro foi recusado pelo proprietario.",
+      data: {
+        type: "customer_status",
+        status
+      }
+    }
+  );
+
+  return customer;
 }
 
 async function ensureCustomerAvailable(

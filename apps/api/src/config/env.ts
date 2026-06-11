@@ -9,7 +9,8 @@ const envSchema = z.object({
   NODE_ENV: z.string().default("development"),
   EMAIL_FROM: z.string().email().optional(),
   RESEND_API_KEY: z.string().optional(),
-  BREVO_API_KEY: z.string().optional()
+  BREVO_API_KEY: z.string().optional(),
+  FIREBASE_SERVICE_ACCOUNT_BASE64: z.string().optional()
 });
 
 export const env = envSchema.parse(process.env);

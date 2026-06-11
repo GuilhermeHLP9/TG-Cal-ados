@@ -5,6 +5,7 @@ import { env } from "../../config/env";
 import { prisma } from "../../lib/prisma";
 import { sendPasswordResetEmail } from "../../utils/email";
 import { HttpError } from "../../utils/http-error";
+import { notifyCompanyOwners } from "../notifications/notifications.service";
 
 type RegisterInput = {
   name: string;
@@ -75,6 +76,17 @@ export async function register(data: RegisterInput) {
       }
     }
   });
+
+  if (user.customer?.status === "PENDING") {
+    void notifyCompanyOwners(companyId, {
+      title: "Novo cliente aguardando aprovacao",
+      body: `${user.name} solicitou vinculo com ${data.companyName}.`,
+      data: {
+        type: "customer_pending",
+        customerId: customer.id
+      }
+    });
+  }
 
   return buildAuthResponse(user);
 }

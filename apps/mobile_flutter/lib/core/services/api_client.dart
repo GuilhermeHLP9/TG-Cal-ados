@@ -97,6 +97,21 @@ class ApiClient {
     return AuthUser.fromJson(response as Map<String, dynamic>);
   }
 
+  Future<void> registerNotificationDevice({
+    required String token,
+    required String deviceToken,
+    String? platform,
+  }) async {
+    await _post(
+      '/notifications/device',
+      token: token,
+      body: {
+        'token': deviceToken,
+        if (platform != null && platform.isNotEmpty) 'platform': platform,
+      },
+    );
+  }
+
   Future<AuthUser> updateMe({
     required String token,
     String? name,

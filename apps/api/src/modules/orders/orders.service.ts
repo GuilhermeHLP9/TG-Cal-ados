@@ -1,6 +1,7 @@
 import { OrderStatus } from "@prisma/client";
 import { prisma } from "../../lib/prisma";
 import { HttpError } from "../../utils/http-error";
+import { notifyCompanyOwners, notifyUsers } from "../notifications/notifications.service";
 
 type UserRole = "CLIENT" | "OWNER";
 
@@ -39,7 +40,7 @@ export async function createOrder(data: CreateOrderInput) {
 
   const totalPrice = data.quantity * data.pricePerPair;
 
-  return prisma.order.create({
+  const order = await prisma.order.create({
     data: {
       clientId: data.ownerId,
       customerId,
@@ -56,6 +57,12 @@ export async function createOrder(data: CreateOrderInput) {
     },
     include: orderInclude
   });
+
+  void notifyOwnersAboutNewOrder(customerId, order.number).catch((error) => {
+    console.error("[Solex] Falha ao notificar novo pedido", error);
+  });
+
+  return order;
 }
 
 export async function listOrders(userId: string, role: UserRole) {
@@ -133,7 +140,7 @@ export async function updateOrderStatus(
   ensureAllowedStatusTransition(order.status, status);
   const normalizedRefusalReason = normalizeRefusalReason(status, refusalReason);
 
-  return prisma.order.update({
+  const updatedOrder = await prisma.order.update({
     where: { id: orderId },
     data: {
       status,
@@ -141,6 +148,18 @@ export async function updateOrderStatus(
     },
     include: orderInclude
   });
+
+  void notifyUsers([order.clientId], {
+    title: "Pedido atualizado",
+    body: `Pedido #${order.number} agora esta em ${statusLabel(status)}.`,
+    data: {
+      type: "order_status",
+      orderId,
+      status
+    }
+  });
+
+  return updatedOrder;
 }
 
 function normalizeRefusalReason(status: OrderStatus, refusalReason?: string) {
@@ -314,4 +333,39 @@ async function getOwnerCompanyId(userId: string) {
   }
 
   return user.companyId;
+}
+
+async function notifyOwnersAboutNewOrder(customerId: string, orderNumber: number) {
+  const customer = await prisma.customer.findUnique({
+    where: { id: customerId },
+    select: {
+      name: true,
+      companyId: true
+    }
+  });
+
+  if (!customer) {
+    return;
+  }
+
+  await notifyCompanyOwners(customer.companyId, {
+    title: "Novo pedido recebido",
+    body: `${customer.name} criou o pedido #${orderNumber}.`,
+    data: {
+      type: "new_order",
+      orderNumber: String(orderNumber)
+    }
+  });
+}
+
+function statusLabel(status: OrderStatus) {
+  const labels: Record<OrderStatus, string> = {
+    RECEBIDO: "recebido",
+    NOVO: "pedido novo",
+    EM_PRODUCAO: "producao",
+    PARA_ENTREGA: "entrega",
+    RECUSADO: "recusado"
+  };
+
+  return labels[status];
 }

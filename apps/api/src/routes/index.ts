@@ -3,6 +3,7 @@ import { authRoutes } from "../modules/auth/auth.routes";
 import { customersRoutes } from "../modules/customers/customers.routes";
 import { meRoutes } from "../modules/me/me.routes";
 import { notesRoutes } from "../modules/notes/notes.routes";
+import { notificationsRoutes } from "../modules/notifications/notifications.routes";
 import { ordersRoutes } from "../modules/orders/orders.routes";
 
 export const routes = Router();
@@ -16,3 +17,4 @@ routes.use("/customers", customersRoutes);
 routes.use("/me", meRoutes);
 routes.use("/orders", ordersRoutes);
 routes.use("/notes", notesRoutes);
+routes.use("/notifications", notificationsRoutes);
