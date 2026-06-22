@@ -12,6 +12,7 @@
     "prisma:deploy": "prisma migrate deploy",
     "seed": "tsx src/scripts/seed.ts",
     "owner:create": "tsx src/scripts/create-owner.ts",
+    "client-data:reset": "tsx src/scripts/reset-client-data.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
